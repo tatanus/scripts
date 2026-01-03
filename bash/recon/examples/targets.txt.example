@@ -1,0 +1,24 @@
+# External Reconnaissance Targets File
+# Supports: Individual IPs, CIDR ranges, and FQDNs
+# Lines starting with # are comments and will be ignored
+
+# Individual IP addresses
+192.168.1.10
+10.0.0.5
+
+# CIDR ranges (will be expanded to individual IPs)
+192.168.1.0/24
+10.0.0.0/28
+
+# Fully Qualified Domain Names
+example.com
+www.example.com
+mail.example.com
+
+# IPv6 addresses (if supported by tools)
+# 2001:db8::1
+
+# Mixed examples
+# 172.16.0.0/16
+# app.example.org
+# api.example.net

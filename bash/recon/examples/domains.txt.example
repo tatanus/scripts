@@ -1,0 +1,17 @@
+# Domains File for OSINT Reconnaissance
+# One domain per line
+# Lines starting with # are comments
+
+# Primary domains
+example.com
+example.net
+example.org
+
+# Subdomains of interest
+# mail.example.com
+# vpn.example.com
+# dev.example.com
+
+# Additional TLDs
+# example.co.uk
+# example.io
