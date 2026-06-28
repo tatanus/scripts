@@ -45,11 +45,11 @@ fi
 
 # Fallback logging if not provided by logger.sh
 if ! declare -f info > /dev/null; then
-    function info()  { printf '[* INFO  ] %s\n' "${1}"; }
+    function info() { printf '[* INFO  ] %s\n' "${1}"; }
 fi
 
 if ! declare -f warn > /dev/null; then
-    function warn()  { printf '[! WARN  ] %s\n' "${1}"; }
+    function warn() { printf '[! WARN  ] %s\n' "${1}"; }
 fi
 
 if ! declare -f error > /dev/null; then
@@ -57,11 +57,11 @@ if ! declare -f error > /dev/null; then
 fi
 
 if ! declare -f pass > /dev/null; then
-    function pass()  { printf '[+ PASS  ] %s\n' "${1}"; }
+    function pass() { printf '[+ PASS  ] %s\n' "${1}"; }
 fi
 
 if ! declare -f fail > /dev/null; then
-    function fail()  { printf '[- ERROR ] %s\n' "${1}"; }
+    function fail() { printf '[- ERROR ] %s\n' "${1}"; }
 fi
 
 if ! declare -f debug > /dev/null; then
@@ -121,8 +121,8 @@ function copy_certs() {
 function update_cert_sync_script() {
     local domain="${1}"
     if [[ -f "${CERT_SYNC_SCRIPT}" ]]; then
-        sed -i "s|/etc/letsencrypt/live/[^/]*/|/etc/letsencrypt/live/${domain}/|g" "${CERT_SYNC_SCRIPT}" \
-            || warn "Could not update domain in cert sync script"
+        sed -i "s|/etc/letsencrypt/live/[^/]*/|/etc/letsencrypt/live/${domain}/|g" "${CERT_SYNC_SCRIPT}" ||
+            warn "Could not update domain in cert sync script"
         pass "Updated domain in cert sync script"
     else
         warn "Cert sync script not found: ${CERT_SYNC_SCRIPT}"

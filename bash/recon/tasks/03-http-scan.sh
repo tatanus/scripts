@@ -81,22 +81,22 @@ run_task_03_http_scan() {
 
                 # 4xx/5xx errors
                 echo "--- Error Responses (4xx/5xx) ---"
-                jq -r 'select(.status_code >= 400) | "\(.url) - \(.status_code) - \(.title // "N/A")"' "${httpx_out}" 2>/dev/null || echo "None"
+                jq -r 'select(.status_code >= 400) | "\(.url) - \(.status_code) - \(.title // "N/A")"' "${httpx_out}" 2> /dev/null || echo "None"
                 echo ""
 
                 # Default credentials pages
                 echo "--- Potential Login Pages ---"
-                jq -r 'select(.title | test("login|sign in|admin|dashboard"; "i")) | "\(.url) - \(.title)"' "${httpx_out}" 2>/dev/null || echo "None"
+                jq -r 'select(.title | test("login|sign in|admin|dashboard"; "i")) | "\(.url) - \(.title)"' "${httpx_out}" 2> /dev/null || echo "None"
                 echo ""
 
                 # Technologies detected
                 echo "--- Technologies Detected ---"
-                jq -r 'select(.technologies) | "\(.url): \(.technologies | join(", "))"' "${httpx_out}" 2>/dev/null || echo "None"
+                jq -r 'select(.technologies) | "\(.url): \(.technologies | join(", "))"' "${httpx_out}" 2> /dev/null || echo "None"
                 echo ""
 
                 # CDN detection
                 echo "--- CDN Protected Services ---"
-                jq -r 'select(.cdn == true) | "\(.url) - CDN detected"' "${httpx_out}" 2>/dev/null || echo "None"
+                jq -r 'select(.cdn == true) | "\(.url) - CDN detected"' "${httpx_out}" 2> /dev/null || echo "None"
             } > "${interesting}"
 
             LOG info "Interesting findings saved to: ${interesting}"
@@ -163,8 +163,8 @@ run_task_03_http_scan() {
         local all_findings="${http_dir}/nuclei_all_findings.txt"
         local all_json="${http_dir}/nuclei_all_findings.json"
 
-        cat "${http_dir}"/nuclei_*.txt > "${all_findings}" 2>/dev/null || true
-        jq -s 'add // []' "${http_dir}"/nuclei_*.json > "${all_json}" 2>/dev/null || true
+        cat "${http_dir}"/nuclei_*.txt > "${all_findings}" 2> /dev/null || true
+        jq -s 'add // []' "${http_dir}"/nuclei_*.json > "${all_json}" 2> /dev/null || true
 
         if [[ -s "${all_findings}" ]]; then
             local total_findings
@@ -176,7 +176,7 @@ run_task_03_http_scan() {
             {
                 echo "=== Nuclei Severity Summary ==="
                 echo ""
-                jq -r '.severity' "${all_json}" 2>/dev/null | sort | uniq -c | sort -rn || echo "Error generating summary"
+                jq -r '.severity' "${all_json}" 2> /dev/null | sort | uniq -c | sort -rn || echo "Error generating summary"
             } > "${severity_summary}"
 
             LOG info "Severity summary: ${severity_summary}"
@@ -201,7 +201,7 @@ run_task_03_http_scan() {
             --threads 10 \
             2>&1 | tee -a "${tee_dir}/gowitness_${timestamp}.tee"
 
-        if [[ -n "$(ls -A "${screenshot_dir}" 2>/dev/null)" ]]; then
+        if [[ -n "$(ls -A "${screenshot_dir}" 2> /dev/null)" ]]; then
             LOG pass "Screenshots captured to: ${screenshot_dir}"
         else
             LOG warn "Screenshot capture did not produce outputs"

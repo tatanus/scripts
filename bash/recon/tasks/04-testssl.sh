@@ -105,8 +105,11 @@ run_task_04_testssl() {
 
         LOG info "Testing: ${test_target}"
 
-        # Sanitize filename
+        # Sanitize filename. Bash parameter expansion does not support
+        # character classes (`${var//[^a-zA-Z0-9._-]/_}` would only match
+        # the literal class string), so sed is the cleanest portable option.
         local safe_name
+        # shellcheck disable=SC2001
         safe_name=$(echo "${test_target}" | sed 's/[^a-zA-Z0-9._-]/_/g')
 
         local output_base="${results_dir}/${safe_name}"
@@ -135,7 +138,7 @@ run_task_04_testssl() {
             # Check for critical findings
             if [[ -f "${output_json}" ]]; then
                 local critical_findings
-                critical_findings=$(jq -r '[.[] | select(.severity == "CRITICAL" or .severity == "HIGH")] | length' "${output_json}" 2>/dev/null || echo "0")
+                critical_findings=$(jq -r '[.[] | select(.severity == "CRITICAL" or .severity == "HIGH")] | length' "${output_json}" 2> /dev/null || echo "0")
 
                 if [[ "${critical_findings}" -gt 0 ]]; then
                     LOG warn "${test_target}: ${critical_findings} critical/high severity findings"
@@ -167,7 +170,7 @@ run_task_04_testssl() {
 
     # Combine all JSON results
     if compgen -G "${results_dir}/*.json" > /dev/null 2>&1; then
-        jq -s 'add // []' "${results_dir}"/*.json > "${aggregate_json}" 2>/dev/null || {
+        jq -s 'add // []' "${results_dir}"/*.json > "${aggregate_json}" 2> /dev/null || {
             LOG warn "Failed to aggregate JSON results"
         }
     fi
@@ -187,33 +190,33 @@ run_task_04_testssl() {
 
         if [[ -f "${aggregate_json}" ]]; then
             echo "=== Severity Distribution ==="
-            jq -r '.[] | select(.severity) | .severity' "${aggregate_json}" 2>/dev/null \
-                | sort | uniq -c | sort -rn || echo "Error processing results"
+            jq -r '.[] | select(.severity) | .severity' "${aggregate_json}" 2> /dev/null |
+                sort | uniq -c | sort -rn || echo "Error processing results"
             echo ""
 
             echo "=== Critical Vulnerabilities ==="
-            jq -r '.[] | select(.severity == "CRITICAL") | "\(.id): \(.finding)"' "${aggregate_json}" 2>/dev/null \
-                || echo "None found"
+            jq -r '.[] | select(.severity == "CRITICAL") | "\(.id): \(.finding)"' "${aggregate_json}" 2> /dev/null ||
+                echo "None found"
             echo ""
 
             echo "=== High Severity Findings ==="
-            jq -r '.[] | select(.severity == "HIGH") | "\(.id): \(.finding)"' "${aggregate_json}" 2>/dev/null \
-                || echo "None found"
+            jq -r '.[] | select(.severity == "HIGH") | "\(.id): \(.finding)"' "${aggregate_json}" 2> /dev/null ||
+                echo "None found"
             echo ""
 
             echo "=== Weak Ciphers Detected ==="
-            jq -r '.[] | select(.id | test("cipher")) | select(.severity == "HIGH" or .severity == "CRITICAL") | "\(.ip): \(.finding)"' "${aggregate_json}" 2>/dev/null \
-                || echo "None found"
+            jq -r '.[] | select(.id | test("cipher")) | select(.severity == "HIGH" or .severity == "CRITICAL") | "\(.ip): \(.finding)"' "${aggregate_json}" 2> /dev/null ||
+                echo "None found"
             echo ""
 
             echo "=== Certificate Issues ==="
-            jq -r '.[] | select(.id | test("cert")) | select(.severity != "OK" and .severity != "INFO") | "\(.ip): \(.finding)"' "${aggregate_json}" 2>/dev/null \
-                || echo "None found"
+            jq -r '.[] | select(.id | test("cert")) | select(.severity != "OK" and .severity != "INFO") | "\(.ip): \(.finding)"' "${aggregate_json}" 2> /dev/null ||
+                echo "None found"
             echo ""
 
             echo "=== Protocol Vulnerabilities ==="
-            jq -r '.[] | select(.id | test("heartbleed|ccs|ticketbleed|robot|breach|crime|poodle")) | "\(.ip): \(.id) - \(.finding)"' "${aggregate_json}" 2>/dev/null \
-                || echo "None found"
+            jq -r '.[] | select(.id | test("heartbleed|ccs|ticketbleed|robot|breach|crime|poodle")) | "\(.ip): \(.id) - \(.finding)"' "${aggregate_json}" 2> /dev/null ||
+                echo "None found"
         fi
 
     } > "${aggregate_summary}"
@@ -233,8 +236,8 @@ run_task_04_testssl() {
     local vulnerable_hosts="${testssl_dir}/vulnerable_hosts.txt"
 
     if [[ -f "${aggregate_json}" ]]; then
-        jq -r '.[] | select(.severity == "CRITICAL" or .severity == "HIGH") | .ip' "${aggregate_json}" 2>/dev/null \
-            | sort -u > "${vulnerable_hosts}" || true
+        jq -r '.[] | select(.severity == "CRITICAL" or .severity == "HIGH") | .ip' "${aggregate_json}" 2> /dev/null |
+            sort -u > "${vulnerable_hosts}" || true
 
         if [[ -s "${vulnerable_hosts}" ]]; then
             local vuln_count

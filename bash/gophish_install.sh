@@ -31,7 +31,7 @@
 #==============================================================================
 # Strict mode
 #==============================================================================
-set -euo pipefail
+set -uo pipefail
 IFS=$'\n\t'
 
 # Script semantic version
@@ -44,8 +44,8 @@ readonly __version__
 SCRIPT_NAME="$(basename "$0")"
 
 # Install/Service defaults
-GOPHISH_DIR="/opt/gophish"                   # Installation directory
-GOPHISH_USER="gophish"                       # Dedicated service user
+GOPHISH_DIR="/opt/gophish" # Installation directory
+GOPHISH_USER="gophish"     # Dedicated service user
 REPO_URL="https://github.com/kgretzky/gophish.git"
 
 # CLI arguments (populated by parse_args)
@@ -76,39 +76,39 @@ LOG_FILE="${LOG_FILE:-}"
 # Map command -> apt package (Ubuntu/Debian)
 declare -A pkg_map=(
     # Core network/tools
-          [curl]="curl"
-          [git]="git"
-          [wget]="wget"
-          [unzip]="unzip"
+    [curl]="curl"
+    [git]="git"
+    [wget]="wget"
+    [unzip]="unzip"
 
     # Shell/CLI utilities used by the script
-          [sed]="sed"
-          [grep]="grep"
-          [tar]="tar"
-          [jq]="jq"
-          [sqlite3]="sqlite3"
-          [rsync]="rsync"
-          [screen]="screen"
+    [sed]="sed"
+    [grep]="grep"
+    [tar]="tar"
+    [jq]="jq"
+    [sqlite3]="sqlite3"
+    [rsync]="rsync"
+    [screen]="screen"
 
     # Package-proxy mappings (package name != command name)
-          [htpasswd]="apache2-utils"
-          [dig]="dnsutils"
-          [timeout]="coreutils"
-          [ifconfig]="net-tools"
-          [setcap]="libcap2-bin"
-          [update - ca - certificates]="ca-certificates"
-          [gcc]="build-essential"
-          [make]="build-essential"
+    [htpasswd]="apache2-utils"
+    [dig]="dnsutils"
+    [timeout]="coreutils"
+    [ifconfig]="net-tools"
+    [setcap]="libcap2-bin"
+    [update - ca - certificates]="ca-certificates"
+    [gcc]="build-essential"
+    [make]="build-essential"
 
     # Direct package = command
-          [certbot]="certbot"
+    [certbot]="certbot"
 
     # Optional/quality-of-life
-          [upx]="upx"
+    [upx]="upx"
 
     # Environment/core (no apt package to install "just this")
-          [systemctl]=""
-          [apt - get]=""
+    [systemctl]=""
+    [apt - get]=""
 )
 
 # Default commands to validate
@@ -167,11 +167,11 @@ if ! declare -f _log_core > /dev/null; then
         local color_prefix=""
         case "${level}" in
             DEBUG) color_prefix="${blue}" ;;
-            INFO)  color_prefix="${dim}" ;;
-            PASS)  color_prefix="${green}" ;;
-            WARN)  color_prefix="${yellow}" ;;
+            INFO) color_prefix="${dim}" ;;
+            PASS) color_prefix="${green}" ;;
+            WARN) color_prefix="${yellow}" ;;
             ERROR | FAIL) color_prefix="${red}" ;;
-            *) color_prefix="${dim}" ;;  # Default to dim for unknown levels
+            *) color_prefix="${dim}" ;; # Default to dim for unknown levels
         esac
 
         local line="[${ts}] [${label}] ${msg}"
@@ -189,12 +189,12 @@ if ! declare -f _log_core > /dev/null; then
 fi
 
 # Public logging shims
-if ! declare -f info  > /dev/null; then function info()  { _log_core "INFO"  "* INFO "  "${1}"; }; fi
-if ! declare -f warn  > /dev/null; then function warn()  { _log_core "WARN"  "! WARN "  "${1}"; }; fi
-if ! declare -f error > /dev/null; then function error() { _log_core "ERROR" "- ERROR"  "${1}"; }; fi
-if ! declare -f pass  > /dev/null; then function pass()  { _log_core "PASS"  "+ PASS "  "${1}"; }; fi
-if ! declare -f fail  > /dev/null; then function fail()  { _log_core "FAIL"  "! FAIL "  "${1}"; }; fi
-if ! declare -f debug > /dev/null; then function debug() { _log_core "DEBUG" "# DEBUG"  "${1}"; }; fi
+if ! declare -f info > /dev/null; then function info() { _log_core "INFO" "* INFO " "${1}"; }; fi
+if ! declare -f warn > /dev/null; then function warn() { _log_core "WARN" "! WARN " "${1}"; }; fi
+if ! declare -f error > /dev/null; then function error() { _log_core "ERROR" "- ERROR" "${1}"; }; fi
+if ! declare -f pass > /dev/null; then function pass() { _log_core "PASS" "+ PASS " "${1}"; }; fi
+if ! declare -f fail > /dev/null; then function fail() { _log_core "FAIL" "! FAIL " "${1}"; }; fi
+if ! declare -f debug > /dev/null; then function debug() { _log_core "DEBUG" "# DEBUG" "${1}"; }; fi
 
 #==============================================================================
 # Utility / Validation
@@ -695,7 +695,7 @@ function obtain_certs() {
 
     # Check if certs exist AND are readable
     if [[ -f "${live_dir}/fullchain.pem" && -r "${live_dir}/fullchain.pem" &&
-          -f "${live_dir}/privkey.pem" && -r "${live_dir}/privkey.pem" ]]; then
+        -f "${live_dir}/privkey.pem" && -r "${live_dir}/privkey.pem" ]]; then
         pass "Existing Let's Encrypt certs found for ${phish_domain}; skipping issuance."
         return 0
     fi
@@ -720,7 +720,7 @@ function obtain_certs() {
 
     # Verify certs exist AND are readable after certbot runs
     if [[ -f "${live_dir}/fullchain.pem" && -r "${live_dir}/fullchain.pem" &&
-          -f "${live_dir}/privkey.pem" && -r "${live_dir}/privkey.pem" ]]; then
+        -f "${live_dir}/privkey.pem" && -r "${live_dir}/privkey.pem" ]]; then
         pass "Let's Encrypt certificates obtained (manual) for ${phish_domain}."
     else
         die 7 "Certbot completed but expected files not found or not readable in ${live_dir}."
@@ -838,7 +838,7 @@ EOF
     info "Installing cert sync helper script…"
     cat > /usr/local/sbin/gophish-cert-sync << EOF
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 echo "[gophish-cert-sync] starting"
 cp /etc/letsencrypt/live/${phish_domain}/fullchain.pem /etc/gophish/certs/phish/fullchain.pem
 cp /etc/letsencrypt/live/${phish_domain}/privkey.pem    /etc/gophish/certs/phish/privkey.pem
@@ -929,9 +929,9 @@ function setup_firewall() {
         info "Configuring firewalld firewall rules…"
         if {
             firewall-cmd --permanent --add-service=ssh &&
-                   firewall-cmd --permanent --add-port=80/tcp &&
-                   firewall-cmd --permanent --add-port=443/tcp &&
-                   firewall-cmd --reload
+                firewall-cmd --permanent --add-port=80/tcp &&
+                firewall-cmd --permanent --add-port=443/tcp &&
+                firewall-cmd --reload
         }; then
             pass "firewalld configured."
         else
@@ -1043,28 +1043,28 @@ function check_reputation() {
     )
 
     declare -A rbl_removal=(
-          [zen.spamhaus.org]="https://check.spamhaus.org/removal/"
-          [sbl.spamhaus.org]="https://check.spamhaus.org/removal/"
-          [xbl.spamhaus.org]="https://check.spamhaus.org/removal/"
-          [pbl.spamhaus.org]="https://check.spamhaus.org/removal/"
-          [b.barracudacentral.org]="https://www.barracudanetworks.com/support/knowledgebase/100227.htm"
-          [bl.spamcop.net]="https://www.spamcop.net/bl.shtml"
-          [cbl.abuseat.org]="https://cbl.abuseat.org/removal.html"
-          [dnsbl.sorbs.net]="https://www.sorbs.net/lookup.shtml"
-          [dul.dnsbl.sorbs.net]="https://www.sorbs.net/lookup.shtml"
-          [spam.dnsbl.sorbs.net]="https://www.sorbs.net/lookup.shtml"
-          [dnsbl - 1.uceprotect.net]="https://www.uceprotect.net/en/index.php?m=7&s=0"
-          [dnsbl - 2.uceprotect.net]="https://www.uceprotect.net/en/index.php?m=7&s=0"
-          [dnsbl - 3.uceprotect.net]="https://www.uceprotect.net/en/index.php?m=7&s=0"
-          [psbl.surriel.com]="https://psbl.surriel.com/removal/"
-          [spamrbl.imp.ch]="https://imp.ch/spamrbl/"
-          [db.wpbl.info]="http://db.wpbl.info/"
-          [bl.mailspike.net]="https://www.mailspike.net/lookup"
-          [ix.dnsbl.manitu.net]="mailto:dnsbl@manitu.net"
-          [all.s5h.net]="https://www.s5h.net/blacklist"
-          [hostkarma.junkemailfilter.com]="https://www.junkemailfilter.com/remove-from-blacklist"
-          [dnsbl.dronebl.org]="https://dronebl.org/lookup"
-          [bl.nosolicitado.org]="https://www.nosolicitado.org/lookup.php"
+        [zen.spamhaus.org]="https://check.spamhaus.org/removal/"
+        [sbl.spamhaus.org]="https://check.spamhaus.org/removal/"
+        [xbl.spamhaus.org]="https://check.spamhaus.org/removal/"
+        [pbl.spamhaus.org]="https://check.spamhaus.org/removal/"
+        [b.barracudacentral.org]="https://www.barracudanetworks.com/support/knowledgebase/100227.htm"
+        [bl.spamcop.net]="https://www.spamcop.net/bl.shtml"
+        [cbl.abuseat.org]="https://cbl.abuseat.org/removal.html"
+        [dnsbl.sorbs.net]="https://www.sorbs.net/lookup.shtml"
+        [dul.dnsbl.sorbs.net]="https://www.sorbs.net/lookup.shtml"
+        [spam.dnsbl.sorbs.net]="https://www.sorbs.net/lookup.shtml"
+        [dnsbl - 1.uceprotect.net]="https://www.uceprotect.net/en/index.php?m=7&s=0"
+        [dnsbl - 2.uceprotect.net]="https://www.uceprotect.net/en/index.php?m=7&s=0"
+        [dnsbl - 3.uceprotect.net]="https://www.uceprotect.net/en/index.php?m=7&s=0"
+        [psbl.surriel.com]="https://psbl.surriel.com/removal/"
+        [spamrbl.imp.ch]="https://imp.ch/spamrbl/"
+        [db.wpbl.info]="http://db.wpbl.info/"
+        [bl.mailspike.net]="https://www.mailspike.net/lookup"
+        [ix.dnsbl.manitu.net]="mailto:dnsbl@manitu.net"
+        [all.s5h.net]="https://www.s5h.net/blacklist"
+        [hostkarma.junkemailfilter.com]="https://www.junkemailfilter.com/remove-from-blacklist"
+        [dnsbl.dronebl.org]="https://dronebl.org/lookup"
+        [bl.nosolicitado.org]="https://www.nosolicitado.org/lookup.php"
     )
 
     # Domain URI blocklists
@@ -1084,18 +1084,18 @@ function check_reputation() {
     )
 
     declare -A surbl_removal=(
-          [multi.surbl.org]="https://www.surbl.org/delisting-request"
-          [ab.surbl.org]="https://www.surbl.org/delisting-request"
-          [wsbl.surbl.org]="https://www.surbl.org/delisting-request"
-          [ph.surbl.org]="https://www.surbl.org/delisting-request"
-          [rhsbl.surbl.org]="https://www.surbl.org/delisting-request"
-          [uribl.spamhaus.org]="https://uribl.spamhaus.org/removal/"
-          [black.uribl.com]="https://uribl.com/delisting-request"
-          [grey.uribl.com]="https://uribl.com/delisting-request"
-          [red.uribl.com]="https://uribl.com/delisting-request"
-          [malware.uribl.com]="https://uribl.com/delisting-request"
-          [phishing.uribl.com]="https://uribl.com/delisting-request"
-          [dbl.spamhaus.org]="https://check.spamhaus.org"
+        [multi.surbl.org]="https://www.surbl.org/delisting-request"
+        [ab.surbl.org]="https://www.surbl.org/delisting-request"
+        [wsbl.surbl.org]="https://www.surbl.org/delisting-request"
+        [ph.surbl.org]="https://www.surbl.org/delisting-request"
+        [rhsbl.surbl.org]="https://www.surbl.org/delisting-request"
+        [uribl.spamhaus.org]="https://uribl.spamhaus.org/removal/"
+        [black.uribl.com]="https://uribl.com/delisting-request"
+        [grey.uribl.com]="https://uribl.com/delisting-request"
+        [red.uribl.com]="https://uribl.com/delisting-request"
+        [malware.uribl.com]="https://uribl.com/delisting-request"
+        [phishing.uribl.com]="https://uribl.com/delisting-request"
+        [dbl.spamhaus.org]="https://check.spamhaus.org"
     )
 
     info "Checking IP ${ip} against ${#rbls[@]} DNSBLs…"

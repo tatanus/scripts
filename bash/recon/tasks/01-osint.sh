@@ -51,8 +51,8 @@ run_task_01_osint() {
             LOG pass "Subfinder found ${subdomain_count} subdomains"
 
             # Extract subdomains to text file for other tools
-            jq -r '.host // .domain // empty' "${subfinder_out}" \
-                | sort -u > "${osint_dir}/subdomains.txt"
+            jq -r '.host // .domain // empty' "${subfinder_out}" |
+                sort -u > "${osint_dir}/subdomains.txt"
         else
             LOG warn "Subfinder did not produce output"
         fi
@@ -153,9 +153,9 @@ run_task_01_osint() {
         local m365_out="${osint_dir}/m365_recon.json"
 
         # Run M365 recon for each domain
-        while IFS= read -r domain || [[ -n "$domain" ]]; do
-            domain=$(echo "$domain" | xargs)
-            [[ -z "$domain" || "$domain" =~ ^# ]] && continue
+        while IFS= read -r domain || [[ -n "${domain}" ]]; do
+            domain=$(echo "${domain}" | xargs)
+            [[ -z "${domain}" || "${domain}" =~ ^# ]] && continue
 
             LOG info "M365 recon for domain: ${domain}"
 
@@ -177,22 +177,22 @@ run_task_01_osint() {
 
         local crtsh_out="${osint_dir}/crtsh.json"
 
-        while IFS= read -r domain || [[ -n "$domain" ]]; do
-            domain=$(echo "$domain" | xargs)
-            [[ -z "$domain" || "$domain" =~ ^# ]] && continue
+        while IFS= read -r domain || [[ -n "${domain}" ]]; do
+            domain=$(echo "${domain}" | xargs)
+            [[ -z "${domain}" || "${domain}" =~ ^# ]] && continue
 
             LOG info "Querying crt.sh for: ${domain}"
 
             curl -sS --connect-timeout 10 --max-time 30 \
                 "https://crt.sh/?q=${domain}&output=json" \
-                2>/dev/null >> "${crtsh_out}.${domain}" || {
+                2> /dev/null >> "${crtsh_out}.${domain}" || {
                 LOG warn "crt.sh query failed for ${domain}"
             }
         done < "${domains_file}"
 
         # Combine all crt.sh results
         if compgen -G "${crtsh_out}.*" > /dev/null; then
-            jq -s 'add' "${crtsh_out}".* > "${crtsh_out}" 2>/dev/null || true
+            jq -s 'add' "${crtsh_out}".* > "${crtsh_out}" 2> /dev/null || true
             rm -f "${crtsh_out}".*
             LOG pass "Certificate transparency data collected"
         fi

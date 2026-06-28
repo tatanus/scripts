@@ -20,7 +20,7 @@ IFS=$'\n\t'
 # Guard to prevent multiple sourcing (portable; works on macOS Bash 3.2)
 #----------------------------------------------------------------------------
 if [[ -n "${COMMON_UTILS_SH_LOADED:-}" ]]; then
-    if ( return 0 2> /dev/null); then
+    if (return 0 2> /dev/null); then
         return 0
     else
         : # executed as a script; continue
@@ -96,12 +96,12 @@ function log_msg() {
     fi
     printf '%b%s%b %s\n' "${color_prefix}" "${prefix}" "${color_reset}" "${message}" >&2
 }
-function info()  { log_msg "INFO"  "${1}"; }
-function warn()  { log_msg "WARN"  "${1}"; }
+function info() { log_msg "INFO" "${1}"; }
+function warn() { log_msg "WARN" "${1}"; }
 function error() { log_msg "ERROR" "${1}"; }
-function fail()  { log_msg "FAIL"  "${1}"; }
-function pass()  { log_msg "PASS"  "${1}"; }
-function success()  { log_msg "SUCCESS"  "${1}"; }
+function fail() { log_msg "FAIL" "${1}"; }
+function pass() { log_msg "PASS" "${1}"; }
+function success() { log_msg "SUCCESS" "${1}"; }
 function debug() { log_msg "DEBUG" "${1}"; }
 
 #==============================================================================
@@ -192,7 +192,7 @@ function validate_tools() {
         warn "Neither 'nc' nor 'openssl' found. SMTP banner tests will fall back to /dev/tcp (best-effort)."
     fi
 
-    ((ok == 1))   || die 1 "Required tools missing."
+    ((ok == 1)) || die 1 "Required tools missing."
 }
 
 ###############################################################################

@@ -18,10 +18,10 @@ IFS=$'\n\t'
 # Guard to prevent multiple sourcing (portable for old bash)
 if [[ -n "${SAFE_SOURCE_SH_LOADED:-}" ]]; then
     # If we're sourced, we can return; if not, do nothing (no-op)
-    if ( return 0 2> /dev/null); then
+    if (return 0 2> /dev/null); then
         return 0
     else
-        :  # not in a sourced context; continue without re-running body
+        : # not in a sourced context; continue without re-running body
     fi
 else
     SAFE_SOURCE_SH_LOADED=1
@@ -44,11 +44,11 @@ if [[ -r "$(__script_dir)/logger.sh" ]]; then
 fi
 
 # Fallback logging if logger not provided
-if ! declare -f info  > /dev/null; then function info() { printf '[* INFO  ] %s\n' "${1}"; }; fi
-if ! declare -f warn  > /dev/null; then function warn() { printf '[! WARN  ] %s\n' "${1}" >&2; }; fi
+if ! declare -f info > /dev/null; then function info() { printf '[* INFO  ] %s\n' "${1}"; }; fi
+if ! declare -f warn > /dev/null; then function warn() { printf '[! WARN  ] %s\n' "${1}" >&2; }; fi
 if ! declare -f error > /dev/null; then function error() { printf '[- ERROR ] %s\n' "${1}" >&2; }; fi
-if ! declare -f pass  > /dev/null; then function pass() { printf '[+ PASS  ] %s\n' "${1}"; }; fi
-if ! declare -f fail  > /dev/null; then function fail() { printf '[! FAIL  ] %s\n' "${1}" >&2; }; fi
+if ! declare -f pass > /dev/null; then function pass() { printf '[+ PASS  ] %s\n' "${1}"; }; fi
+if ! declare -f fail > /dev/null; then function fail() { printf '[! FAIL  ] %s\n' "${1}" >&2; }; fi
 if ! declare -f debug > /dev/null; then function debug() { printf '[# DEBUG ] %s\n' "${1}"; }; fi
 
 #==============================================================================
@@ -69,7 +69,7 @@ function _sorted_unique_file() { # usage: _sorted_unique_file <in> <out>
 
 # Snapshot helpers
 function _snapshot_alias_names() { alias | sed -E 's/^alias[[:space:]]+([^=]+)=.*/\1/' | LC_ALL=C sort -u; }
-function _snapshot_alias_defs()  { alias; }
+function _snapshot_alias_defs() { alias; }
 function _snapshot_functions_list() { compgen -A function | LC_ALL=C sort -u; }
 function _snapshot_functions_bodies() {
     local fn
@@ -78,9 +78,9 @@ function _snapshot_functions_bodies() {
         printf '\n'
     done
 }
-function _snapshot_vars_list()      { compgen -A variable | LC_ALL=C sort -u; }
-function _snapshot_exports_list()   { env | LC_ALL=C sort; }
-function _snapshot_export_names()   { cut -d= -f1; }
+function _snapshot_vars_list() { compgen -A variable | LC_ALL=C sort -u; }
+function _snapshot_exports_list() { env | LC_ALL=C sort; }
+function _snapshot_export_names() { cut -d= -f1; }
 
 #==============================================================================
 # take_env_snapshot <dir>
@@ -92,12 +92,12 @@ function take_env_snapshot() {
         return 2
     }
 
-    _snapshot_vars_list                                > "${dir}/vars.list"
-    _snapshot_exports_list                             > "${dir}/exports.list"
-    _snapshot_exports_list | _snapshot_export_names    > "${dir}/exports.names"
-    _snapshot_alias_names                              > "${dir}/aliases.names"
-    _snapshot_alias_defs                               > "${dir}/aliases.defs"
-    _snapshot_functions_list                           > "${dir}/funcs.names"
+    _snapshot_vars_list > "${dir}/vars.list"
+    _snapshot_exports_list > "${dir}/exports.list"
+    _snapshot_exports_list | _snapshot_export_names > "${dir}/exports.names"
+    _snapshot_alias_names > "${dir}/aliases.names"
+    _snapshot_alias_defs > "${dir}/aliases.defs"
+    _snapshot_functions_list > "${dir}/funcs.names"
     _snapshot_functions_list | _snapshot_functions_bodies > "${dir}/funcs.bodies"
 }
 
@@ -189,14 +189,14 @@ function safe_unsource() {
     a_vn="${after_dir}/vars.sorted"
     b_en="${before_dir}/exports.names.sorted"
     a_en="${after_dir}/exports.names.sorted"
-    _sorted_unique_file "${before_dir}/funcs.names"   "${b_fn}"
-    _sorted_unique_file "${after_dir}/funcs.names"    "${a_fn}"
+    _sorted_unique_file "${before_dir}/funcs.names" "${b_fn}"
+    _sorted_unique_file "${after_dir}/funcs.names" "${a_fn}"
     _sorted_unique_file "${before_dir}/aliases.names" "${b_an}"
-    _sorted_unique_file "${after_dir}/aliases.names"  "${a_an}"
-    _sorted_unique_file "${before_dir}/vars.list"     "${b_vn}"
-    _sorted_unique_file "${after_dir}/vars.list"      "${a_vn}"
+    _sorted_unique_file "${after_dir}/aliases.names" "${a_an}"
+    _sorted_unique_file "${before_dir}/vars.list" "${b_vn}"
+    _sorted_unique_file "${after_dir}/vars.list" "${a_vn}"
     _sorted_unique_file "${before_dir}/exports.names" "${b_en}"
-    _sorted_unique_file "${after_dir}/exports.names"  "${a_en}"
+    _sorted_unique_file "${after_dir}/exports.names" "${a_en}"
 
     #--------------------------
     # Functions: unset new, restore originals

@@ -19,9 +19,9 @@ IFS=$'\n\t'
 # Module dependencies (adjust as needed)
 script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 source "${script_dir}/common_utils.sh"
-source "${script_dir}/dns_utils.sh"  2> /dev/null || true
+source "${script_dir}/dns_utils.sh" 2> /dev/null || true
 source "${script_dir}/smtp_utils.sh" 2> /dev/null || true
-source "${script_dir}/web_utils.sh"  2> /dev/null || true
+source "${script_dir}/web_utils.sh" 2> /dev/null || true
 source "${script_dir}/cloud_surface_utils.sh" 2> /dev/null || true
 source "${script_dir}/json_utils.sh" 2> /dev/null || true
 
@@ -363,11 +363,11 @@ XML
 
     local json_arr=""
     if command -v xmllint > /dev/null 2>&1; then
-        json_arr="$(xmllint --xpath '//*[local-name()="Domain"]/text()' 2> /dev/null <<< "${body}" \
-            | tr ' ' '\n' | sed '/^$/d' | jq -R -s -c 'split("\n")|map(select(length>0))' || true)"
+        json_arr="$(xmllint --xpath '//*[local-name()="Domain"]/text()' 2> /dev/null <<< "${body}" |
+            tr ' ' '\n' | sed '/^$/d' | jq -R -s -c 'split("\n")|map(select(length>0))' || true)"
     else
-        json_arr="$(grep -oE '<[^:]*Domain>[^<]+' <<< "${body}" | sed -E 's/.*>(.*)$/\1/' \
-            | jq -R -s -c 'split("\n")|map(select(length>0))' || true)"
+        json_arr="$(grep -oE '<[^:]*Domain>[^<]+' <<< "${body}" | sed -E 's/.*>(.*)$/\1/' |
+            jq -R -s -c 'split("\n")|map(select(length>0))' || true)"
     fi
     [[ -z "${json_arr}" ]] && json_arr='[]'
 
@@ -624,7 +624,7 @@ function check_azure_services() {
         # If we have a target, merge into the accumulator object.
         if [[ -n "${targets}" ]]; then
             obj="$(jq -c --arg k "${host}" --arg t "${targets}" --arg s "${status}" \
-                   '. + {($k):{cname:$t, hint:$s}}' <<< "${obj}")"
+                '. + {($k):{cname:$t, hint:$s}}' <<< "${obj}")"
         fi
     done
 
@@ -708,7 +708,7 @@ function check_azure_services_deep() {
         fqdn="${label}.${domain}"
         _wait_for_slot "${max_jobs}"
 
-        (   
+        (
             # Resolve CNAME (dns_query_generic emits JSON array of strings).
             cname_json="$(dns_query_generic "CNAME" "${fqdn}" "${dns_server}")"
             target="$(printf '%s\n' "${cname_json}" | jq -r '.[0] // empty')"

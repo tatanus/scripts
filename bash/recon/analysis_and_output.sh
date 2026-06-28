@@ -19,9 +19,9 @@ IFS=$'\n\t'
 # Module dependencies (adjust as needed)
 script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 source "${script_dir}/common_utils.sh"
-source "${script_dir}/dns_utils.sh"  2> /dev/null || true
+source "${script_dir}/dns_utils.sh" 2> /dev/null || true
 source "${script_dir}/smtp_utils.sh" 2> /dev/null || true
-source "${script_dir}/web_utils.sh"  2> /dev/null || true
+source "${script_dir}/web_utils.sh" 2> /dev/null || true
 source "${script_dir}/cloud_surface_utils.sh" 2> /dev/null || true
 source "${script_dir}/json_utils.sh" 2> /dev/null || true
 
@@ -65,7 +65,7 @@ function analyze_results() {
     local _msg="" _wt=0
     function add_finding() {
         _msg="${1}"
-                     _wt="${2}"
+        _wt="${2}"
         findings+=("${1}")
         # Only add numeric weights >= 0
         if [[ "${_wt}" =~ ^[0-9]+$ ]]; then
@@ -215,13 +215,13 @@ function analyze_results() {
         '{ analysis: { findings: $f, risk_score: ($r|tonumber) } }'
 }
 
-    function add_finding() {
-        _msg="${1}"
-                     _wt="${2}"
-        findings+=("${1}")
-        # Only add numeric weights >= 0
-        if [[ "${_wt}" =~ ^[0-9]+$ ]]; then
-            risk=$((risk + _wt))
+function add_finding() {
+    _msg="${1}"
+    _wt="${2}"
+    findings+=("${1}")
+    # Only add numeric weights >= 0
+    if [[ "${_wt}" =~ ^[0-9]+$ ]]; then
+        risk=$((risk + _wt))
     fi
 }
 

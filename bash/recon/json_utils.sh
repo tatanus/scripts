@@ -50,7 +50,7 @@ function json_merge() {
             # Start with a shallow merge for general keys
             . * $i
             #
-            # Now deep-merge azure_services sub-structure so fragments don’t clobber each other
+            # Now deep-merge azure_services sub-structure so fragments do not clobber each other
             | .azure_services =
                 ( (.azure_services // {})
                   + ($i.azure_services // {})

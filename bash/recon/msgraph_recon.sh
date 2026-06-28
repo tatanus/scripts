@@ -17,13 +17,13 @@ IFS=$'\n\t'
 # =============================================================================
 
 # Module dependencies (adjust as needed)
-script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 source "${script_dir}/common_utils.sh"
-source "${script_dir}/dns_utils.sh"  2>/dev/null || true
-source "${script_dir}/smtp_utils.sh" 2>/dev/null || true
-source "${script_dir}/web_utils.sh"  2>/dev/null || true
-source "${script_dir}/cloud_surface_utils.sh" 2>/dev/null || true
-source "${script_dir}/json_utils.sh" 2>/dev/null || true
+source "${script_dir}/dns_utils.sh" 2> /dev/null || true
+source "${script_dir}/smtp_utils.sh" 2> /dev/null || true
+source "${script_dir}/web_utils.sh" 2> /dev/null || true
+source "${script_dir}/cloud_surface_utils.sh" 2> /dev/null || true
+source "${script_dir}/json_utils.sh" 2> /dev/null || true
 
 #==============================================================================
 # Microsoft Graph (optional, authenticated)
@@ -139,7 +139,7 @@ function graph_collect_applications() {
     items="$(graph_get_paginated "${url}" "${token}" "${max_items}")"
 
     jq -n \
-        --argjson apps  "${items:-[]}" \
+        --argjson apps "${items:-[]}" \
         --argjson total "$(jq 'length' <<< "${items}")" \
         '{ graph: { applications: $apps, applications_total: $total } }'
 }
@@ -177,7 +177,7 @@ function graph_collect_service_principals() {
     items="$(graph_get_paginated "${url}" "${token}" "${max_items}")"
 
     jq -n \
-        --argjson sps   "${items:-[]}" \
+        --argjson sps "${items:-[]}" \
         --argjson total "$(jq 'length' <<< "${items}")" \
         '{ graph: { service_principals: $sps, service_principals_total: $total } }'
 }
@@ -229,4 +229,3 @@ function graph_infer_mdi_from_service_principals() {
         --arg present "${present}" \
         '{ defender_for_identity: { present: ($present=="true"), matches: $matches, note:"inferred from service principals" } }'
 }
-

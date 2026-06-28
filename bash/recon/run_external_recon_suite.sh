@@ -19,7 +19,8 @@ IFS=$'\n\t'
 # Constants & Globals
 #===============================================================================
 readonly SCRIPT_VERSION="1.0.0"
-readonly SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
+readonly SCRIPT_DIR
 readonly COMMON_CORE_LIB="${COMMON_CORE_LIB:-/Users/pentest/Desktop/DEV/new/common_core/lib}"
 
 # Exit codes
@@ -63,12 +64,12 @@ else
         local level="${1:-info}"
         shift
         case "${level}" in
-            info)  info "$*" ;;
-            warn)  warn "$*" ;;
-            error|fail) fail "$*" ;;
-            pass)  pass "$*" ;;
+            info) info "$*" ;;
+            warn) warn "$*" ;;
+            error | fail) fail "$*" ;;
+            pass) pass "$*" ;;
             debug) debug "$*" ;;
-            *) echo "[$level] $*" >&2 ;;
+            *) echo "[${level}] $*" >&2 ;;
         esac
     }
 fi
@@ -79,19 +80,19 @@ fi
 
 # Task execution control
 declare -gA TASK_ENABLED=(
-    [00-validate]=true
-    [01-osint]=true
-    [02-nmap]=true
-    [03-http-scan]=true
-    [04-testssl]=true
+    [00 - validate]=true
+    [01 - osint]=true
+    [02 - nmap]=true
+    [03 - http - scan]=true
+    [04 - testssl]=true
 )
 
 declare -gA TASK_REQUIRED=(
-    [00-validate]=true
-    [01-osint]=false
-    [02-nmap]=false
-    [03-http-scan]=false
-    [04-testssl]=false
+    [00 - validate]=true
+    [01 - osint]=false
+    [02 - nmap]=false
+    [03 - http - scan]=false
+    [04 - testssl]=false
 )
 
 # Task execution order (array maintains order)
@@ -440,31 +441,31 @@ main() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -h|--help)
+            -h | --help)
                 print_usage
                 exit 0
                 ;;
-            -v|--version)
+            -v | --version)
                 print_version
                 exit 0
                 ;;
-            -l|--list)
+            -l | --list)
                 list_tasks
                 exit 0
                 ;;
-            -t|--task)
+            -t | --task)
                 specific_task="${2:-}"
                 shift 2
                 ;;
-            -s|--skip)
+            -s | --skip)
                 skip_tasks+=("${2:-}")
                 shift 2
                 ;;
-            -d|--dry-run)
+            -d | --dry-run)
                 export RECON_DRY_RUN=true
                 shift
                 ;;
-            -c|--config)
+            -c | --config)
                 local config_file="${2:-}"
                 if [[ -f "${config_file}" ]]; then
                     # shellcheck source=/dev/null

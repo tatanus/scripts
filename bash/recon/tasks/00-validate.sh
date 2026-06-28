@@ -18,18 +18,18 @@ cidr_to_ips() {
     # Prefer ipcalc if available
     if command -v ipcalc > /dev/null 2>&1; then
         local network broadcast
-        network=$(ipcalc -n "$cidr" | awk '/Network:/ {print $2}' | cut -d'/' -f1)
-        broadcast=$(ipcalc -b "$cidr" | awk '/Broadcast:/ {print $2}')
-        [[ -n "$network" && -n "$broadcast" ]] || return 1
+        network=$(ipcalc -n "${cidr}" | awk '/Network:/ {print $2}' | cut -d'/' -f1)
+        broadcast=$(ipcalc -b "${cidr}" | awk '/Broadcast:/ {print $2}')
+        [[ -n "${network}" && -n "${broadcast}" ]] || return 1
 
-        IFS=. read -r n1 n2 n3 n4 <<< "$network"
-        IFS=. read -r b1 b2 b3 b4 <<< "$broadcast"
+        IFS=. read -r n1 n2 n3 n4 <<< "${network}"
+        IFS=. read -r b1 b2 b3 b4 <<< "${broadcast}"
 
         for ((i1 = n1; i1 <= b1; i1++)); do
             for ((i2 = n2; i2 <= b2; i2++)); do
                 for ((i3 = n3; i3 <= b3; i3++)); do
                     for ((i4 = n4; i4 <= b4; i4++)); do
-                        echo "$i1.$i2.$i3.$i4"
+                        echo "${i1}.${i2}.${i3}.${i4}"
                     done
                 done
             done
@@ -39,16 +39,16 @@ cidr_to_ips() {
 
     # Fallback: use nmap if present
     if command -v nmap > /dev/null 2>&1; then
-        nmap -sL -n "$cidr" 2> /dev/null \
-            | awk '/Nmap scan report/{print $NF}' \
-            | sed 's/[()]//g'
+        nmap -sL -n "${cidr}" 2> /dev/null |
+            awk '/Nmap scan report/{print $NF}' |
+            sed 's/[()]//g'
         return 0
     fi
 
     # Pure Bash fallback
     local ip mask
-    IFS=/ read -r ip mask <<< "$cidr"
-    IFS=. read -r o1 o2 o3 o4 <<< "$ip"
+    IFS=/ read -r ip mask <<< "${cidr}"
+    IFS=. read -r o1 o2 o3 o4 <<< "${ip}"
 
     local ip_int=$(((o1 << 24) + (o2 << 16) + (o3 << 8) + o4))
     local mask_int=$((0xFFFFFFFF << (32 - mask) & 0xFFFFFFFF))
@@ -74,13 +74,13 @@ expand_targets_to_file() {
     local destination_file=$2
     local tmpfile
 
-    if [[ -z "$source_file" || -z "$destination_file" ]]; then
+    if [[ -z "${source_file}" || -z "${destination_file}" ]]; then
         LOG error "expand_targets_to_file: source and destination required"
         return 1
     fi
 
-    if [[ ! -f "$source_file" ]]; then
-        LOG error "Source file not found: $source_file"
+    if [[ ! -f "${source_file}" ]]; then
+        LOG error "Source file not found: ${source_file}"
         return 1
     fi
 
@@ -89,23 +89,23 @@ expand_targets_to_file() {
         return 1
     }
 
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        line=$(echo "$line" | xargs)
-        [[ -z "$line" || "$line" =~ ^# ]] && continue
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+        line=$(echo "${line}" | xargs)
+        [[ -z "${line}" || "${line}" =~ ^# ]] && continue
 
         # Check if CIDR
-        if [[ "$line" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]+$ ]]; then
-            cidr_to_ips "$line" >> "$tmpfile"
-        elif [[ "$line" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-            echo "$line" >> "$tmpfile"
+        if [[ "${line}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]+$ ]]; then
+            cidr_to_ips "${line}" >> "${tmpfile}"
+        elif [[ "${line}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            echo "${line}" >> "${tmpfile}"
         else
             # Assume FQDN
-            echo "$line" >> "$tmpfile"
+            echo "${line}" >> "${tmpfile}"
         fi
-    done < "$source_file"
+    done < "${source_file}"
 
-    sort -u "$tmpfile" > "$destination_file"
-    rm -f "$tmpfile"
+    sort -u "${tmpfile}" > "${destination_file}"
+    rm -f "${tmpfile}"
 
     return 0
 }
@@ -117,6 +117,9 @@ expand_targets_to_file() {
 run_task_00_validate() {
     LOG info "Starting input validation and expansion"
 
+    # TARGETS_FILE is the env-set global from the calling shell; targets_file
+    # is the function-local copy. Different identifiers by design.
+    # shellcheck disable=SC2153
     local targets_file="${TARGETS_FILE}"
     local domains_file="${DOMAINS_FILE:-}"
     local recon_dir="${ENGAGEMENT_DIR}/RECON"
@@ -152,7 +155,7 @@ run_task_00_validate() {
             LOG warn "Domains file specified but not found: ${domains_file}"
         else
             local domain_count
-            domain_count=$(grep -v '^#' "${domains_file}" | grep -v '^[[:space:]]*$' | wc -l)
+            domain_count=$(grep -cvE '^(#|[[:space:]]*$)' "${domains_file}")
             LOG pass "Validated ${domain_count} domains"
             export VALIDATED_DOMAINS_FILE="${domains_file}"
         fi

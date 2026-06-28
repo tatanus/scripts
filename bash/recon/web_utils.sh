@@ -20,7 +20,7 @@ IFS=$'\n\t'
 # Guard to prevent multiple sourcing (portable; works on macOS Bash 3.2)
 #----------------------------------------------------------------------------
 if [[ -n "${WEB_UTILS_SH_LOADED:-}" ]]; then
-    if ( return 0 2> /dev/null ); then
+    if (return 0 2> /dev/null); then
         return 0
     else
         : # executed as a script; continue
@@ -85,12 +85,12 @@ function head_with_bearer() {
     local url="$1"
     # force headers fetch, silence stderr to avoid noisy DNS/SSL logs
     local hdr
-    hdr="$(curl -sI -m 7 -A "${CURL_UA}" "$url" 2> /dev/null || true)"
+    hdr="$(curl -sI -m 7 -A "${CURL_UA}" "${url}" 2> /dev/null || true)"
     local code
-    code="$(printf '%s\n' "$hdr" | awk 'NR==1{print $2}')"
-    if printf '%s' "$hdr" | grep -qiE '^www-authenticate:\s*Bearer\b'; then
-        printf '%s|true|%s\n' "${code:-0}" "$hdr"
+    code="$(printf '%s\n' "${hdr}" | awk 'NR==1{print $2}')"
+    if printf '%s' "${hdr}" | grep -qiE '^www-authenticate:\s*Bearer\b'; then
+        printf '%s|true|%s\n' "${code:-0}" "${hdr}"
     else
-        printf '%s|false|%s\n' "${code:-0}" "$hdr"
+        printf '%s|false|%s\n' "${code:-0}" "${hdr}"
     fi
 }

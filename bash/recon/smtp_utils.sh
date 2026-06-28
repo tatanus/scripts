@@ -20,7 +20,7 @@ IFS=$'\n\t'
 # Guard to prevent multiple sourcing (portable; works on macOS Bash 3.2)
 #----------------------------------------------------------------------------
 if [[ -n "${SMTP_UTILS_SH_LOADED:-}" ]]; then
-    if ( return 0 2> /dev/null ); then
+    if (return 0 2> /dev/null); then
         return 0
     else
         : # executed as a script; continue
@@ -93,7 +93,7 @@ function do_smtp_probe() {
 
     # Try STARTTLS advertisement with EHLO (best-effort)
     local ehlo supports_starttls="false" code="0"
-    ehlo="$(run_with_timeout 7s bash -c "exec 3<>/dev/tcp/${mx_host}/${port}; echo -e 'EHLO example.com\r' >&3; sleep 1; cat <&3 | head -n 10; exec 3<&- 3>&-" 2> /dev/null || true)"
+    ehlo="$(run_with_timeout 7s bash -c "exec 3<>/dev/tcp/${mx_host}/${port}; printf '%b\n' 'EHLO example.com\r' >&3; sleep 1; cat <&3 | head -n 10; exec 3<&- 3>&-" 2> /dev/null || true)"
     if echo "${ehlo}" | grep -qi 'STARTTLS'; then
         supports_starttls="true"
     fi

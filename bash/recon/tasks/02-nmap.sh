@@ -217,7 +217,7 @@ run_task_02_nmap() {
     local web_services_file="${nmap_dir}/web_services.txt"
     if [[ -f "${top_ports_out}.gnmap" ]]; then
         # Extract HTTP services
-        grep -oP '\d+/open/tcp//http//' "${top_ports_out}.gnmap" 2>/dev/null | while read -r line; do
+        grep -oP '\d+/open/tcp//http//' "${top_ports_out}.gnmap" 2> /dev/null | while read -r line; do
             local ip port
             ip=$(echo "${line}" | awk '{print $2}')
             port=$(echo "${line}" | grep -oP '\d+(?=/open)')
@@ -225,7 +225,7 @@ run_task_02_nmap() {
         done > "${web_services_file}"
 
         # Extract HTTPS services
-        grep -oP '\d+/open/tcp//https//' "${top_ports_out}.gnmap" 2>/dev/null | while read -r line; do
+        grep -oP '\d+/open/tcp//https//' "${top_ports_out}.gnmap" 2> /dev/null | while read -r line; do
             local ip port
             ip=$(echo "${line}" | awk '{print $2}')
             port=$(echo "${line}" | grep -oP '\d+(?=/open)')

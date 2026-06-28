@@ -19,9 +19,9 @@ IFS=$'\n\t'
 # Module dependencies (adjust as needed)
 script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 source "${script_dir}/common_utils.sh"
-source "${script_dir}/dns_utils.sh"  2> /dev/null || true
+source "${script_dir}/dns_utils.sh" 2> /dev/null || true
 source "${script_dir}/smtp_utils.sh" 2> /dev/null || true
-source "${script_dir}/web_utils.sh"  2> /dev/null || true
+source "${script_dir}/web_utils.sh" 2> /dev/null || true
 source "${script_dir}/cloud_surface_utils.sh" 2> /dev/null || true
 source "${script_dir}/json_utils.sh" 2> /dev/null || true
 
@@ -42,8 +42,8 @@ analyze_spf_json() {
     txt_rr="$(dns_query_generic "TXT" "${domain}" "${dns_server}")"
     # Normalize: strip outer quotes/whitespace, select v=spf1
     spf_arr="$(
-        printf '%s\n' "${txt_rr}" \
-            | jq '[ .[] | gsub("^(\"|\\s+)|(\"$)"; "") | select(test("(?i)(^|\\s)v=spf1\\b")) ]'
+        printf '%s\n' "${txt_rr}" |
+            jq '[ .[] | gsub("^(\"|\\s+)|(\"$)"; "") | select(test("(?i)(^|\\s)v=spf1\\b")) ]'
     )"
 
     spf_count="$(jq 'length' <<< "${spf_arr}")"
@@ -63,11 +63,11 @@ analyze_spf_json() {
     # terminal all
     local terminal="none"
     if grep -Eq '(^|[[:space:]])-all($|[[:space:]])' <<< "${primary}"; then
-                                                                         terminal="-all"
+        terminal="-all"
     elif grep -Eq '(^|[[:space:]])~all($|[[:space:]])' <<< "${primary}"; then
-                                                                           terminal="~all"
+        terminal="~all"
     elif grep -Eq '(^|[[:space:]])\?all($|[[:space:]])' <<< "${primary}"; then
-                                                                            terminal="?all"
+        terminal="?all"
     else terminal="none"; fi
 
     case "${terminal}" in
@@ -75,6 +75,7 @@ analyze_spf_json() {
         ~all) warn "SPF: Ends with ~all (softfail) — ok for transition, tighten later" ;;
         ?all) warn "SPF: Ends with ?all (neutral) — generally not recommended" ;;
         none) fail "SPF: Missing terminal ~all/-all" ;;
+        *) warn "SPF: Unknown terminal qualifier: ${terminal}" ;;
     esac
 
     # +all detection
@@ -93,7 +94,7 @@ analyze_spf_json() {
     # (SPF limit is 10; this is heuristic)
     local est_lookups=0
     for mech in 'include:' 'a' 'mx' 'ptr' 'exists:' 'redirect='; do
-        c="$(tr ' ' '\n' <<< "${primary}" | grep -Ei "^${mech}" | wc -l | tr -d ' ')"
+        c="$(tr ' ' '\n' <<< "${primary}" | grep -Eic "^${mech}")"
         est_lookups=$((est_lookups + c))
     done
     if ((est_lookups > 10)); then
@@ -136,7 +137,7 @@ analyze_dmarc_json() {
 
     pass "DMARC: Record present"
     local v_ok=false
-                    grep -qi '^v=DMARC1' <<< "${rec}" && v_ok=true
+    grep -qi '^v=DMARC1' <<< "${rec}" && v_ok=true
 
     # Extract tags
     local p sp adkim aspf rua ruf pct
@@ -151,39 +152,40 @@ analyze_dmarc_json() {
 
     # Issues
     local -a issues=()
-    $v_ok || issues+=("bad_version")
+    ${v_ok} || issues+=("bad_version")
     case "${p,,}" in
         reject) pass "DMARC: p=reject" ;;
         quarantine) warn "DMARC: p=quarantine — consider reject when ready" ;;
         none | "")
-             issues+=("p_none")
-                                 fail "DMARC: p=none"
-                                                     ;;
+            issues+=("p_none")
+            fail "DMARC: p=none"
+            ;;
         *)
             issues+=("p_unknown")
-                              warn "DMARC: p=${p}"
-                                                  ;;
+            warn "DMARC: p=${p}"
+            ;;
     esac
     [[ -z "${rua}" ]] && {
-                         issues+=("missing_rua")
-                                                  warn "DMARC: missing rua="
+        issues+=("missing_rua")
+        warn "DMARC: missing rua="
     }
     [[ -n "${ruf}" ]] && info "DMARC: ruf=${ruf}"
-    case "${adkim,,}" in s) pass "DMARC: adkim=strict" ;; "" | r) issues+=("adkim_relaxed_or_missing") ;; esac
-    case "${aspf,,}" in s) pass "DMARC: aspf=strict" ;; "" | r) issues+=("aspf_relaxed_or_missing") ;; esac
+    case "${adkim,,}" in s) pass "DMARC: adkim=strict" ;; "" | r) issues+=("adkim_relaxed_or_missing") ;; *) : ;; esac
+    case "${aspf,,}" in s) pass "DMARC: aspf=strict" ;; "" | r) issues+=("aspf_relaxed_or_missing") ;; *) : ;; esac
     if [[ -n "${sp}" ]]; then
         case "${sp,,}" in
             reject) : ;;
             quarantine) issues+=("sp_quarantine") ;;
             none) issues+=("sp_none") ;;
+            *) : ;;
         esac
     fi
     if ! [[ "${pct}" =~ ^[0-9]+$ ]]; then
         issues+=("pct_non_numeric")
-                                 warn "DMARC: pct non-numeric"
+        warn "DMARC: pct non-numeric"
     elif ((pct < 100)); then
         issues+=("pct_less_than_100")
-                                   warn "DMARC: pct=${pct}"
+        warn "DMARC: pct=${pct}"
     else
         pass "DMARC: pct=100"
     fi
@@ -203,7 +205,7 @@ analyze_mx_json() {
     local mx_rr
     mx_rr="$(dns_query_generic "MX" "${domain}" "${dns_server}")"
     local count
-               count="$(jq 'length' <<< "${mx_rr}")"
+    count="$(jq 'length' <<< "${mx_rr}")"
 
     if [[ "${count}" -eq 0 ]]; then
         warn "MX: No MX records"
@@ -220,8 +222,9 @@ analyze_mx_json() {
     fi
 
     # Flag targets that are CNAMEs/IP literals (by pattern; deep check would need extra queries)
-    # We’ll parse host field: strip pref then target
-    local bad="$(printf '%s\n' "${mx_rr}" | jq '
+    # We'll parse host field: strip pref then target
+    local bad
+    bad="$(printf '%s\n' "${mx_rr}" | jq '
     [ .[]
       | (if test("^[0-9]+\\s+") then capture("(?<pref>^[0-9]+)\\s+(?<host>.+)$").host else . end)
       | rtrimstr(".")
@@ -302,7 +305,7 @@ analyze_dkim_json() {
     local -a all=("${default[@]}" "${extra[@]}")
     local found=0
     local tmp
-             tmp="$(mktemp)"
+    tmp="$(mktemp)"
 
     for sel in "${all[@]}"; do
         local name="${sel}._domainkey.${domain}"
@@ -315,7 +318,7 @@ analyze_dkim_json() {
             grep -qi '^v=DKIM1' <<< "${rec}" || issues+=("missing_v")
             if grep -qi 'p=' <<< "${rec}"; then
                 local pval
-                    pval="$(tr ';' '\n' <<< "${rec}" | awk '/^[Pp]=/ {sub(/^[Pp]=/,""); gsub(/[[:space:]]/,""); print; exit}')"
+                pval="$(tr ';' '\n' <<< "${rec}" | awk '/^[Pp]=/ {sub(/^[Pp]=/,""); gsub(/[[:space:]]/,""); print; exit}')"
                 local len=${#pval}
                 ((len > 0 && len < 100)) && issues+=("p_too_short_heuristic")
                 jq -n --arg sel "${sel}" --arg rec "${rec}" --argjson key_len "${len}" \
@@ -373,8 +376,8 @@ function do_dns_suite() {
     # FIX: Strip surrounding quotes before testing for v=spf1
     # Also tolerate leading whitespace.
     spf_arr="$(
-        printf '%s\n' "${txt_rr}" \
-            | jq '[ .[] | gsub("^(\"|\\s+)|(\"$)"; "") | select(test("(?i)(^|\\s)v=spf1\\b")) ]'
+        printf '%s\n' "${txt_rr}" |
+            jq '[ .[] | gsub("^(\"|\\s+)|(\"$)"; "") | select(test("(?i)(^|\\s)v=spf1\\b")) ]'
     )"
 
     jq -n --arg server "${dns_server}" --arg domain "${domain}" \
@@ -441,9 +444,9 @@ function do_dns_srv_suite() {
     # Compose a namespaced JSON object; tolerate empty variables by defaulting
     # to '[]' so downstream jq does not break.
     jq -n \
-        --argjson sip   "${sip:-[]}" \
+        --argjson sip "${sip:-[]}" \
         --argjson sipfd "${sipfed:-[]}" \
-        --argjson ad    "${adis:-[]}" \
+        --argjson ad "${adis:-[]}" \
         '{ srv: { sip_tls:$sip, sipfederation_tls:$sipfd, autodiscover_tcp:$ad } }'
 }
 
@@ -467,8 +470,8 @@ function do_eop_eval() {
 
     # Extract host, trim trailing dot, then endswith() the suffix.
     matches="$(
-        printf '%s\n' "${mx_rr}" \
-            | jq --arg suf "${eop_suffix}" '
+        printf '%s\n' "${mx_rr}" |
+            jq --arg suf "${eop_suffix}" '
             [ .[]
               | (if test("^[0-9]+\\s+") then capture("(?<pref>^[0-9]+)\\s+(?<host>.+)$").host else . end)
               | rtrimstr(".")

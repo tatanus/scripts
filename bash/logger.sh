@@ -42,7 +42,7 @@ if [[ -z "${LOGGER_SH_LOADED:-}" ]]; then
         blue="\033[0;34m"
         light_red="\033[0;31m"
         yellow="\033[0;33m"
-        orange="\033[1;33m"  # Fallback to yellow
+        orange="\033[1;33m" # Fallback to yellow
         white="\033[0;37m"
         reset="\033[0m"
     fi
@@ -190,12 +190,12 @@ if [[ -z "${LOGGER_SH_LOADED:-}" ]]; then
     function logger_log() {
         local -r instance_name="${1:-${instance_name_default}}"
         local -r level="${2:-${log_level_default}}"
-        local -r message="${3:-}" # Allow blank messages
+        local -r message="${3:-}"                # Allow blank messages
         local -r caller_info="${4:-$(caller 1)}" # Caller information for debug messages
 
         # Validate the log level
         _validate_log_level "${level}" || return 1
-            # Validate the log level
+        # Validate the log level
         if ! _validate_log_level "${level}"; then
             # Print error and propagate failure
             printf "Error: Invalid log level '%s'\n" "${level}" >&2
@@ -269,13 +269,13 @@ if [[ -z "${LOGGER_SH_LOADED:-}" ]]; then
         timestamp=$(_logger_timestamp)
         case "${level}" in
             vdebug) prefix="[ # V-DBG ]" ;; # verbose debug
-            debug)  prefix="[ # DEBUG ]" ;;
-            info)   prefix="[ * INFO  ]" ;;
-            warn)   prefix="[ ! WARN  ]" ;;
-            pass)   prefix="[ + PASS  ]" ;;
-            fail)   prefix="[ - FAIL  ]" ;;
-            error)  prefix="[ - ERROR ]" ;;
-            *)      prefix="[ UNKNOWN ]" ;; # Fallback for unexpected log levels
+            debug) prefix="[ # DEBUG ]" ;;
+            info) prefix="[ * INFO  ]" ;;
+            warn) prefix="[ ! WARN  ]" ;;
+            pass) prefix="[ + PASS  ]" ;;
+            fail) prefix="[ - FAIL  ]" ;;
+            error) prefix="[ - ERROR ]" ;;
+            *) prefix="[ UNKNOWN ]" ;; # Fallback for unexpected log levels
         esac
 
         # Format the log message, including debug info if applicable
@@ -299,13 +299,13 @@ if [[ -z "${LOGGER_SH_LOADED:-}" ]]; then
             local color
             case "${level}" in
                 vdebug) color="${orange}" ;;
-                debug)  color="${orange}" ;;
-                info)   color="${blue}" ;;
-                warn)   color="${yellow}" ;;
-                pass)   color="${light_green}" ;;
-                fail)   color="${light_red}" ;;
-                error)  color="${light_red}" ;;
-                *)      color="${white}" ;;
+                debug) color="${orange}" ;;
+                info) color="${blue}" ;;
+                warn) color="${yellow}" ;;
+                pass) color="${light_green}" ;;
+                fail) color="${light_red}" ;;
+                error) color="${light_red}" ;;
+                *) color="${white}" ;;
             esac
             printf "%s %b%s%b %s\n" "${timestamp}" "${color}" "${prefix}" "${reset}" "${formatted_message}"
         fi

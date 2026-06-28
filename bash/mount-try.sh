@@ -52,7 +52,7 @@
 #
 ###############################################################################
 
-set -euo pipefail
+set -uo pipefail
 IFS=$'\n\t'
 
 # Enable extended globbing for validation
@@ -93,12 +93,13 @@ log_warning() {
     log "[!] $*"
 }
 
-# Cleanup function to remove credentials file
+# Cleanup function to remove credentials file — registered as the EXIT trap handler below.
+# shellcheck disable=SC2317,SC2329  # invoked indirectly via `trap cleanup EXIT` (SC2317 = older shellcheck, SC2329 = newer)
 cleanup() {
     local exit_code=$?
     if [[ -n "${CREDS_FILE}" && -f "${CREDS_FILE}" ]]; then
         log_info "Cleaning up credentials file..."
-        shred -u "${CREDS_FILE}" 2>/dev/null || rm -f "${CREDS_FILE}"
+        shred -u "${CREDS_FILE}" 2> /dev/null || rm -f "${CREDS_FILE}"
     fi
     exit "${exit_code}"
 }
@@ -140,7 +141,7 @@ check_prerequisites() {
     local missing_cmds=()
 
     for cmd in mount mountpoint smbcacls; do
-        if ! command -v "${cmd}" &>/dev/null; then
+        if ! command -v "${cmd}" &> /dev/null; then
             missing_cmds+=("${cmd}")
         fi
     done
@@ -304,7 +305,7 @@ validate_mountpoint() {
 
     # Resolve to absolute path to prevent path traversal
     local abs_path
-    abs_path="$(readlink -m "${mpoint}" 2>/dev/null)" || {
+    abs_path="$(readlink -m "${mpoint}" 2> /dev/null)" || {
         log_error "Invalid mount point path: ${mpoint}"
         return 2
     }
@@ -401,8 +402,8 @@ done
 check_prerequisites
 
 # Verify required arguments are set
-if [[ -z "${SERVER_HOST:-}" ]] || [[ -z "${SHARE_NAME:-}" ]] || \
-   [[ -z "${USER:-}" ]] || [[ ! -v PASS ]]; then
+if [[ -z "${SERVER_HOST:-}" ]] || [[ -z "${SHARE_NAME:-}" ]] ||
+    [[ -z "${USER:-}" ]] || [[ ! -v PASS ]]; then
     log_error "Missing required arguments."
     print_usage
     exit 1
@@ -433,10 +434,10 @@ if [[ -z "${MPOINT:-}" || "${MPOINT}" == "/mnt/cifs_share" ]]; then
     MPOINT="./${SAFE_SERVER}-${SAFE_SHARE}"
 
     # Handle mount point collisions by adding counter if needed
-    if [[ -e "${MPOINT}" ]] && ! mountpoint -q "${MPOINT}" 2>/dev/null; then
+    if [[ -e "${MPOINT}" ]] && ! mountpoint -q "${MPOINT}" 2> /dev/null; then
         MPOINT_COUNTER=1
         ORIGINAL_MPOINT="${MPOINT}"
-        while [[ -e "${MPOINT}" ]] && ! mountpoint -q "${MPOINT}" 2>/dev/null; do
+        while [[ -e "${MPOINT}" ]] && ! mountpoint -q "${MPOINT}" 2> /dev/null; do
             MPOINT="${ORIGINAL_MPOINT}_${MPOINT_COUNTER}"
             ((MPOINT_COUNTER++))
             if [[ ${MPOINT_COUNTER} -gt 100 ]]; then

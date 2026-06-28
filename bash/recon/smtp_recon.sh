@@ -19,11 +19,11 @@ IFS=$'\n\t'
 # Module dependencies (adjust as needed)
 script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 source "${script_dir}/common_utils.sh"
-source "${script_dir}/dns_utils.sh"             2> /dev/null || true
-source "${script_dir}/smtp_utils.sh"            2> /dev/null || true
-source "${script_dir}/web_utils.sh"             2> /dev/null || true
-source "${script_dir}/cloud_surface_utils.sh"   2> /dev/null || true
-source "${script_dir}/json_utils.sh"            2> /dev/null || true
+source "${script_dir}/dns_utils.sh" 2> /dev/null || true
+source "${script_dir}/smtp_utils.sh" 2> /dev/null || true
+source "${script_dir}/web_utils.sh" 2> /dev/null || true
+source "${script_dir}/cloud_surface_utils.sh" 2> /dev/null || true
+source "${script_dir}/json_utils.sh" 2> /dev/null || true
 
 #==============================================================================
 # SMTP Probing
@@ -220,7 +220,7 @@ function do_direct_send_probe() {
               {
                 exec 3<>/dev/tcp/${mx_host}/25
                 end_banner=0
-                deadline=$((SECONDS + ${seconds}))
+                deadline=$((SECONDS + seconds))
                 while IFS= read -r -t 1 ln <&3; do
                   echo \"\${ln}\"
                   if [[ \"\${ln}\" =~ ^220[[:space:]] ]]; then end_banner=1; break; fi
@@ -265,12 +265,12 @@ function do_direct_send_probe() {
     rcpt_code="$(printf '%s\n' "${transcript}" | _rcpt_code_from_transcript || true)"
     case "${rcpt_code}" in
         250 | 251)
-                 accepted="true"
-                                   reason="rcpt_accepted"
-                                                          ;;
-        450 | 451 | 452 | 421)     reason="temp_fail" ;;   # greylist/deferral
-        "")                        reason="no_rcpt_response" ;;
-        *)                         reason="rcpt_rejected_${rcpt_code}" ;;
+            accepted="true"
+            reason="rcpt_accepted"
+            ;;
+        450 | 451 | 452 | 421) reason="temp_fail" ;; # greylist/deferral
+        "") reason="no_rcpt_response" ;;
+        *) reason="rcpt_rejected_${rcpt_code}" ;;
     esac
 
     local is_eop="false"

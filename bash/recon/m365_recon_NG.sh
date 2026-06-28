@@ -22,9 +22,9 @@ IFS=$'\n\t'
 # Module dependencies (adjust as needed)
 script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 source "${script_dir}/common_utils.sh"
-source "${script_dir}/dns_utils.sh"  2> /dev/null || true
+source "${script_dir}/dns_utils.sh" 2> /dev/null || true
 source "${script_dir}/smtp_utils.sh" 2> /dev/null || true
-source "${script_dir}/web_utils.sh"  2> /dev/null || true
+source "${script_dir}/web_utils.sh" 2> /dev/null || true
 source "${script_dir}/cloud_surface_utils.sh" 2> /dev/null || true
 source "${script_dir}/json_utils.sh" 2> /dev/null || true
 source "${script_dir}/analysis_and_output.sh" 2> /dev/null || true
@@ -207,25 +207,25 @@ function main() {
                 run_azure=1
                 run_saas=1
                 ;;
-            --dns)                  run_dns=1 ;;
-            --srv)                  run_srv=1 ;;
-            --entra)                run_entra=1 ;;
-            --smtp)                 run_smtp=1 ;;
-            --direct-send)          run_direct=1 ;;
-            --sharepoint)           run_sharepoint=1 ;;
-            --teams)                run_teams=1 ;;
-            --b2c)                  run_b2c=1 ;;
-            --saml)                 run_saml=1 ;;
-            --azure-services)       run_azure=1 ;;
-            --saas)                 run_saas=1 ;;
-            --osint)                run_osint=1 ;;
+            --dns) run_dns=1 ;;
+            --srv) run_srv=1 ;;
+            --entra) run_entra=1 ;;
+            --smtp) run_smtp=1 ;;
+            --direct-send) run_direct=1 ;;
+            --sharepoint) run_sharepoint=1 ;;
+            --teams) run_teams=1 ;;
+            --b2c) run_b2c=1 ;;
+            --saml) run_saml=1 ;;
+            --azure-services) run_azure=1 ;;
+            --saas) run_saas=1 ;;
+            --osint) run_osint=1 ;;
             -j | --json-out)
                 shift
                 json_out="${1:-}"
                 ;;
-            --no-color)             ENABLE_COLOR=0 ;;
-            -q | --quiet)           quiet=1 ;;
-            -v | --verbose)         verbose=1 ;;
+            --no-color) ENABLE_COLOR=0 ;;
+            -q | --quiet) quiet=1 ;;
+            -v | --verbose) verbose=1 ;;
             --subdomains)
                 shift
                 subdomains_file="${1:-}"
@@ -234,7 +234,7 @@ function main() {
                 shift
                 threads="${1:-20}"
                 ;;
-            --saas-extended)        saas_extended=1 ;;
+            --saas-extended) saas_extended=1 ;;
             --saas-extra-file)
                 shift
                 saas_extra_file="${1:-}"
@@ -268,11 +268,11 @@ function main() {
 
     # Quiet mode => silence info/debug + disable file logging.
     if ((quiet == 1)); then
-        function info()  { :; }
+        function info() { :; }
         function debug() { :; }
         ENABLE_FILE_LOGGING=0
     fi
-    if ((verbose == 1)); then   debug "Verbose logging enabled."; fi
+    if ((verbose == 1)); then debug "Verbose logging enabled."; fi
 
     # Ensure required tools (curl, jq, dig/host, timeout).
     validate_tools
@@ -290,8 +290,8 @@ function main() {
     info "Target: ${domain} | Cloud: ${cloud} | DNS: ${dns_server}"
 
     # If no collectors chosen, default to everything (including new bits).
-    if ((run_dns + run_srv + run_entra + run_smtp + run_direct + run_osint + run_sharepoint + run_teams + run_b2c + run_saml + run_azure + run_saas == 0)) \
-        && [[ -z "${subdomains_file}" ]] && [[ -z "${token}" ]]; then
+    if ((run_dns + run_srv + run_entra + run_smtp + run_direct + run_osint + run_sharepoint + run_teams + run_b2c + run_saml + run_azure + run_saas == 0)) &&
+        [[ -z "${subdomains_file}" ]] && [[ -z "${token}" ]]; then
         run_dns=1
         run_srv=1
         run_entra=1
@@ -310,7 +310,7 @@ function main() {
     # -----------------------------
     # Execute selected collectors
     # -----------------------------
-    local -a frags=()  # array of JSON fragments
+    local -a frags=() # array of JSON fragments
     local j=""
 
     # DNS + EOP
@@ -361,8 +361,8 @@ function main() {
 
         # Transform "10 host." -> "host" (strip pref/priority and trailing dot).
         mx_hosts_json="$(
-            printf '%s\n' "${mx_src}" \
-                | jq '
+            printf '%s\n' "${mx_src}" |
+                jq '
                 [ .[]
                   | (if test("^[0-9]+\\s+") then capture("(?<pref>^[0-9]+)\\s+(?<host>.+)$").host else . end)
                   | rtrimstr(".")
@@ -443,7 +443,7 @@ function main() {
     # Teams (uses SRV context if available)
     if ((run_teams == 1)); then
         local srv_json="{}"
-        if ((run_srv == 1)); then   srv_json="$(json_merge "${frags[@]}")"; fi
+        if ((run_srv == 1)); then srv_json="$(json_merge "${frags[@]}")"; fi
         frags+=("$(check_teams_presence "${srv_json}")")
     fi
 
@@ -454,11 +454,11 @@ function main() {
 
     # Azure services (shallow + explicit surface checks)
     if ((run_azure == 1)); then
-        frags+=("$(check_azure_services "${domain}" "${dns_server}")")   # existing shallow CNAME hints
-        frags+=("$(check_app_services "${domain}")")                     # NEW explicit App Services
-        frags+=("$(check_storage_accounts "${domain}")")                 # NEW explicit Storage
-        frags+=("$(check_power_apps "${domain}")")                       # NEW explicit Power Apps portals
-        frags+=("$(check_azure_cdn "${domain}" "${dns_server}")")        # NEW explicit CDN patterns
+        frags+=("$(check_azure_services "${domain}" "${dns_server}")") # existing shallow CNAME hints
+        frags+=("$(check_app_services "${domain}")")                   # NEW explicit App Services
+        frags+=("$(check_storage_accounts "${domain}")")               # NEW explicit Storage
+        frags+=("$(check_power_apps "${domain}")")                     # NEW explicit Power Apps portals
+        frags+=("$(check_azure_cdn "${domain}" "${dns_server}")")      # NEW explicit CDN patterns
     fi
 
     # Azure services (deep, only if a wordlist is provided)
@@ -492,9 +492,9 @@ function main() {
     # Merge -> Analyze -> Emit
     # -----------------------------
     local merged="" analysis=""
-    merged="$(json_merge "${frags[@]}")"              # consolidate
-    analysis="$(analyze_results "${merged}")"         # derived findings + risk
-    merged="$(json_merge "${merged}" "${analysis}")"  # attach analysis
+    merged="$(json_merge "${frags[@]}")"             # consolidate
+    analysis="$(analyze_results "${merged}")"        # derived findings + risk
+    merged="$(json_merge "${merged}" "${analysis}")" # attach analysis
 
     # Output JSON (file or stdout) and a human summary.
     if [[ -n "${json_out}" ]]; then

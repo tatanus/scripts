@@ -20,7 +20,7 @@ IFS=$'\n\t'
 # Guard to prevent multiple sourcing (portable; works on macOS Bash 3.2)
 #----------------------------------------------------------------------------
 if [[ -n "${DNS_UTILS_SH_LOADED:-}" ]]; then
-    if ( return 0 2> /dev/null); then
+    if (return 0 2> /dev/null); then
         return 0
     else
         : # executed as a script; continue
@@ -78,19 +78,19 @@ function dns_query_generic() {
         ' || true)"
     fi
 
-    printf '%s\n' "${raw}" \
-        | tr -d '\r' \
-        | sed '/^$/d' \
-        | jq -R -s 'split("\n") | map(select(length>0))'
+    printf '%s\n' "${raw}" |
+        tr -d '\r' |
+        sed '/^$/d' |
+        jq -R -s 'split("\n") | map(select(length>0))'
 }
 
 function resolve_host() {
     # Returns 0 if name has any A/AAAA/CNAME, else 1. Quiet on failure.
     local h="$1"
     if command -v dig > /dev/null 2>&1; then
-        dig +time=2 +tries=1 +short "$h" A AAAA CNAME 2> /dev/null | grep -q .
+        dig +time=2 +tries=1 +short "${h}" A AAAA CNAME 2> /dev/null | grep -q .
     else
         # host(1) fallback
-        host "$h" 2> /dev/null | grep -qE 'has address|alias for|IPv6 address'
+        host "${h}" 2> /dev/null | grep -qE 'has address|alias for|IPv6 address'
     fi
 }

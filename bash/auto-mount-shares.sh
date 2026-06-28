@@ -57,7 +57,7 @@
 #
 ###############################################################################
 
-set -euo pipefail
+set -uo pipefail
 IFS=$'\n\t'
 
 # Enable extended globbing for validation
@@ -114,12 +114,13 @@ log_verbose() {
     fi
 }
 
-# Cleanup function
+# Cleanup function — registered as the EXIT trap handler below.
+# shellcheck disable=SC2317,SC2329  # invoked indirectly via `trap cleanup EXIT` (SC2317 = older shellcheck, SC2329 = newer)
 cleanup() {
     local exit_code=$?
     if [[ -n "${CREDS_FILE}" && -f "${CREDS_FILE}" ]]; then
         log_verbose "Cleaning up credentials file..."
-        shred -u "${CREDS_FILE}" 2>/dev/null || rm -f "${CREDS_FILE}"
+        shred -u "${CREDS_FILE}" 2> /dev/null || rm -f "${CREDS_FILE}"
     fi
     exit "${exit_code}"
 }
@@ -172,12 +173,12 @@ check_prerequisites() {
     local missing_cmds=()
 
     # Check for nxc/netexec
-    if ! command -v nxc &>/dev/null && ! command -v netexec &>/dev/null; then
+    if ! command -v nxc &> /dev/null && ! command -v netexec &> /dev/null; then
         missing_cmds+=("nxc/netexec")
     fi
 
     for cmd in mount mountpoint tee; do
-        if ! command -v "${cmd}" &>/dev/null; then
+        if ! command -v "${cmd}" &> /dev/null; then
             missing_cmds+=("${cmd}")
         fi
     done
@@ -366,7 +367,7 @@ parse_nxc_output() {
                 local share_name=""
                 local perm_index=-1
 
-                for ((i=3; i<${#fields[@]}; i++)); do
+                for ((i = 3; i < ${#fields[@]}; i++)); do
                     if [[ "${fields[${i}]}" == "READ" || "${fields[${i}]}" == "WRITE" ]]; then
                         perm_index=${i}
                         break
@@ -427,7 +428,7 @@ discover_shares() {
 
     # Determine nxc command (could be 'nxc' or 'netexec')
     local nxc_cmd="nxc"
-    if ! command -v nxc &>/dev/null; then
+    if ! command -v nxc &> /dev/null; then
         nxc_cmd="netexec"
     fi
 
@@ -476,10 +477,10 @@ mount_share() {
     local mount_point="${mount_base}/${safe_host}/${safe_share}"
 
     # Handle mount point collisions
-    if [[ -e "${mount_point}" ]] && ! mountpoint -q "${mount_point}" 2>/dev/null; then
+    if [[ -e "${mount_point}" ]] && ! mountpoint -q "${mount_point}" 2> /dev/null; then
         local counter=1
         local original_mount="${mount_point}"
-        while [[ -e "${mount_point}" ]] && ! mountpoint -q "${mount_point}" 2>/dev/null; do
+        while [[ -e "${mount_point}" ]] && ! mountpoint -q "${mount_point}" 2> /dev/null; do
             mount_point="${original_mount}_${counter}"
             ((counter++))
             if [[ ${counter} -gt 100 ]]; then
@@ -494,7 +495,7 @@ mount_share() {
     log_info "Mounting: //${host}/${share} -> ${mount_point}"
 
     # Check if already mounted
-    if mountpoint -q "${mount_point}" 2>/dev/null; then
+    if mountpoint -q "${mount_point}" 2> /dev/null; then
         if [[ "${KEEP_EXISTING}" == false ]]; then
             log_warning "Already mounted: ${mount_point} (skipping)"
             ((SKIPPED_SHARES++))
@@ -539,7 +540,7 @@ mount_share() {
 
         # Clean up failed mount point if empty
         if [[ -d "${mount_point}" ]]; then
-            rmdir "${mount_point}" 2>/dev/null || true
+            rmdir "${mount_point}" 2> /dev/null || true
         fi
         return 1
     fi

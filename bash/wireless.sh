@@ -26,9 +26,9 @@ NC='\033[0m'
 #--------------------------------------
 # Logging Functions
 #--------------------------------------
-function log()    { printf "[%bINFO%b] %s\n" "${BLUE}" "${NC}" "$*"; }
-function warn()   { printf "[%bWARN%b] %s\n" "${YELLOW}" "${NC}" "$*"; }
-function fail()   {
+function log() { printf "[%bINFO%b] %s\n" "${BLUE}" "${NC}" "$*"; }
+function warn() { printf "[%bWARN%b] %s\n" "${YELLOW}" "${NC}" "$*"; }
+function fail() {
     printf "[%bFAIL%b] %s\n" "${RED}" "${NC}" "$*" >&2
     exit 1
 }
@@ -158,8 +158,8 @@ function install_dependencies() {
         log "service_identity present; skipping."
     else
         log "Installing service_identity…"
-        ${PROXY} python3.10 -m pip install --user service-identity \
-            || fail "Failed to install service-identity"
+        ${PROXY} python3.10 -m pip install --user service-identity ||
+            fail "Failed to install service-identity"
     fi
 
     # 3) EAPHammer
@@ -167,15 +167,15 @@ function install_dependencies() {
         log "EAPHammer already in PATH; skipping."
     else
         log "Cloning EAPHammer into ${INSTALL_DIR}/eaphammer…"
-         cd "${INSTALL_DIR}" || fail "Could not [cd] to the tools directory."
+        cd "${INSTALL_DIR}" || fail "Could not [cd] to the tools directory."
         ${PROXY} git clone https://github.com/s0lst1c3/eaphammer.git \
-            "${INSTALL_DIR}/eaphammer" \
-            || fail "git clone eaphammer failed"
+            "${INSTALL_DIR}/eaphammer" ||
+            fail "git clone eaphammer failed"
         cd "${INSTALL_DIR}/eaphammer" || fail "Could not [cd] into the [eaphammer] directory"
         chmod +x ubuntu-unattended-setup
         log "Running EAPHammer unattended setup…"
-        ${PROXY} ./ubuntu-unattended-setup \
-            || fail "EAPHammer setup failed"
+        ${PROXY} ./ubuntu-unattended-setup ||
+            fail "EAPHammer setup failed"
         cd "${orig_dir}" || fail "Could not [cd] into the original directory"
     fi
     # Obtain and import a Let's Encrypt cert via DNS challenge ---
@@ -192,13 +192,13 @@ function install_dependencies() {
         --agree-tos \
         --register-unsafely-without-email \
         -d "${COMPANY}.${WIFI_DNS_DOMAIN}" \
-        --server https://acme-v02.api.letsencrypt.org/directory \
-        || fail "Certbot DNS challenge failed"
+        --server https://acme-v02.api.letsencrypt.org/directory ||
+        fail "Certbot DNS challenge failed"
     # Import the cert into EAPHammer
     eaphammer --cert-wizard import \
         --server-cert "/etc/letsencrypt/live/${COMPANY}.${WIFI_DNS_DOMAIN}/fullchain.pem" \
-        --private-key "/etc/letsencrypt/live/${COMPANY}.${WIFI_DNS_DOMAIN}/privkey.pem" \
-        || fail "EAPHammer cert import failed"
+        --private-key "/etc/letsencrypt/live/${COMPANY}.${WIFI_DNS_DOMAIN}/privkey.pem" ||
+        fail "EAPHammer cert import failed"
 
     # 4) Reaver-WPS-Fork-t6x
     if is_installed reaver; then
@@ -206,8 +206,8 @@ function install_dependencies() {
     else
         log "Cloning & building reaver…"
         cd "${INSTALL_DIR}" || fail "Could not [cd] to the tools directory."
-        git clone https://github.com/t6x/reaver-wps-fork-t6x.git \
-            || fail "git clone reaver failed"
+        git clone https://github.com/t6x/reaver-wps-fork-t6x.git ||
+            fail "git clone reaver failed"
         cd reaver-wps-fork-t6x/src || fail "Could not [cd] into the [reaver-wps-fork-t6x/src] directory"
         ./configure --enable-libnl3 || fail "reaver configure failed"
         make || fail "reaver build failed"
@@ -221,8 +221,8 @@ function install_dependencies() {
     else
         log "Cloning & building pixiewps…"
         cd "${INSTALL_DIR}" || fail "Could not [cd] to the tools directory."
-        git clone https://github.com/wiire-a/pixiewps.git \
-            || fail "git clone pixiewps failed"
+        git clone https://github.com/wiire-a/pixiewps.git ||
+            fail "git clone pixiewps failed"
         cd pixiewps || fail "Could not [cd] into the [pixiewps] directory"
         make || fail "pixiewps build failed"
         make install || fail "pixiewps install failed"
@@ -234,15 +234,15 @@ function install_dependencies() {
         log "bully already installed; skipping."
     else
         log "Installing Bully build deps…"
-        ${PROXY} apt install -y build-essential libpcap-dev \
-            || fail "Failed to install bully apt deps"
+        ${PROXY} apt install -y build-essential libpcap-dev ||
+            fail "Failed to install bully apt deps"
 
         log "Cloning Bully into ${INSTALL_DIR}/bully…"
         cd "${INSTALL_DIR}" || fail "Could not [cd] to the tools directory."
         ${PROXY} git clone https://github.com/aanarchyy/bully.git \
-            "${INSTALL_DIR}/bully" \
-            || fail "git clone bully failed"
-        cd "${INSTALL_DIR}/bully/src"  || fail "Could not [cd] into the [bully/src] directory"
+            "${INSTALL_DIR}/bully" ||
+            fail "git clone bully failed"
+        cd "${INSTALL_DIR}/bully/src" || fail "Could not [cd] into the [bully/src] directory"
         make || fail "bully make failed"
         ${PROXY} make install || fail "bully make install failed"
         cd "${orig_dir}" || fail "Could not [cd] into the original directory"
@@ -253,20 +253,20 @@ function install_dependencies() {
         log "pyrit already installed; skipping."
     else
         log "Installing Pyrit build deps…"
-        ${PROXY} apt install -y python2.7 python2.7-dev libssl-dev zlib1g-dev libpcap0.8-dev python2-pip \
-            || fail "Failed to install pyrit apt deps"
+        ${PROXY} apt install -y python2.7 python2.7-dev libssl-dev zlib1g-dev libpcap0.8-dev python2-pip ||
+            fail "Failed to install pyrit apt deps"
 
         # 7.1. Query GitHub’s API for the *tarball* URL of the latest release
         log "Fetching latest Pyrit tarball URL…"
-        TARBALL_URL=$(${PROXY} curl -s https://api.github.com/repos/JPaulMora/Pyrit/releases/latest \
-            | grep '"tarball_url":' | head -1 | cut -d '"' -f4)
+        TARBALL_URL=$(${PROXY} curl -s https://api.github.com/repos/JPaulMora/Pyrit/releases/latest |
+            grep '"tarball_url":' | head -1 | cut -d '"' -f4)
         [[ -n "${TARBALL_URL}" ]] || fail "Could not determine Pyrit tarball URL"
 
         # 7.2. Download it (follows any redirects) and save as “pyrit-latest.tar.gz”
         log "Downloading Pyrit into ${INSTALL_DIR}…"
         cd "${INSTALL_DIR}" || fail "Could not [cd] to the tools directory."
-        ${PROXY} wget -c "${TARBALL_URL}" -O pyrit-latest.tar.gz \
-            || fail "Failed to download Pyrit"
+        ${PROXY} wget -c "${TARBALL_URL}" -O pyrit-latest.tar.gz ||
+            fail "Failed to download Pyrit"
 
         # 8.3. Extract and enter directory
         tar xzf pyrit-latest.tar.gz || fail "Failed to extract Pyrit"
@@ -279,8 +279,8 @@ function install_dependencies() {
 
         # 7.5 Apply edits, Install Deps, and build/install
         sed -i 's/COMPILE_AESNI/COMPILE_AESNIX/' cpyrit/_cpyrit_cpu.c
-        ${PROXY} python2.7 -m pip install psycopg2-binary scapy \
-            || fail "Failed to install Pyrit Python deps"
+        ${PROXY} python2.7 -m pip install psycopg2-binary scapy ||
+            fail "Failed to install Pyrit Python deps"
         ${PROXY} python2.7 setup.py clean || fail "Pyrit setup.py clean failed"
         ${PROXY} python2.7 setup.py build || fail "Pyrit setup.py build failed"
         ${PROXY} python2.7 setup.py install || fail "Pyrit setup.py install failed"
@@ -294,16 +294,16 @@ function install_dependencies() {
     else
         log "Installing Wifite2 dependencies…"
         ${PROXY} apt install -y \
-            hcxdumptool hcxtools python3-chardet python3-scapy \
-            || fail "Failed to install wifite2 apt deps"
+            hcxdumptool hcxtools python3-chardet python3-scapy ||
+            fail "Failed to install wifite2 apt deps"
 
         log "Cloning Wifite2 into ${INSTALL_DIR}/wifite2…"
         ${PROXY} git clone https://github.com/kimocoder/wifite2.git \
-            "${INSTALL_DIR}/wifite2" \
-            || fail "git clone wifite2 failed"
+            "${INSTALL_DIR}/wifite2" ||
+            fail "git clone wifite2 failed"
         cd "${INSTALL_DIR}/wifite2" || fail "Could not [cd] into the [wifite2] directory"
-        ${PROXY} python3 setup.py install \
-            || fail "Wifite2 install failed"
+        ${PROXY} python3 setup.py install ||
+            fail "Wifite2 install failed"
         cd "${orig_dir}" || fail "Could not [cd] into the original directory"
     fi
 
@@ -459,8 +459,8 @@ function scan_networks() {
     timeout --foreground 15s airodump-ng \
         --output-format netxml,pcap,csv \
         --write "${AIRDUMP_PREFIX}" "${INTERFACE}" \
-        --band abg --beacons \
-        || warn "[Airodump-ng] scan timed out or failed"
+        --band abg --beacons ||
+        warn "[Airodump-ng] scan timed out or failed"
     disable_monitor
 
     log "Network scans complete."
@@ -553,9 +553,9 @@ function list_ssids() {
         for (k in ssid_map) {
             printf "%s\t%s\t%s\t%s\n", ssid_map[k], bssid_map[k], chan_map[k], sec_map[k]
         }
-    }' "${tmpfile}" \
-        | sort -k1,1 -k2,2 -k3,3 \
-        | awk -v show_hidden="${DISPLAY_HIDDEN:-0}" -F'\t' '
+    }' "${tmpfile}" |
+        sort -k1,1 -k2,2 -k3,3 |
+        awk -v show_hidden="${DISPLAY_HIDDEN:-0}" -F'\t' '
     BEGIN {
         printf "%-32s %-20s %-6s %-20s\n", "SSID", "BSSID", "CHAN", "SECURITY"
         print  "--------------------------------------------------------------------------------"
@@ -757,8 +757,8 @@ function main_menu() {
             ssid_display="none"
         fi
 
-        echo -e "Interface: ${YELLOW}${INTERFACE:-none}${NC}  Mode: ${GREEN}${mode_display^^}${NC}  Connection: ${GREEN}${conn}${NC}"
-        echo -e "Selected SSID: ${ssid_display}"
+        printf '%b\n' "Interface: ${YELLOW}${INTERFACE:-none}${NC}  Mode: ${GREEN}${mode_display^^}${NC}  Connection: ${GREEN}${conn}${NC}"
+        printf '%b\n' "Selected SSID: ${ssid_display}"
         echo "------------------------"
         echo "1) Install Dependencies"
         echo "2) Select Wireless Interface"
@@ -796,8 +796,8 @@ function main_menu() {
             11) run_eaphammer_attack ;;
             0)
                 log "Exiting."
-                               break
-                                     ;;
+                break
+                ;;
             *) warn "Invalid option: ${opt}" ;;
         esac
     done

@@ -47,11 +47,11 @@ fi
 
 # Fallback logging if not provided by logger.sh
 if ! declare -f info > /dev/null; then
-    function info()  { printf '[* INFO  ] %s\n' "${1}"; }
+    function info() { printf '[* INFO  ] %s\n' "${1}"; }
 fi
 
 if ! declare -f warn > /dev/null; then
-    function warn()  { printf '[! WARN  ] %s\n' "${1}"; }
+    function warn() { printf '[! WARN  ] %s\n' "${1}"; }
 fi
 
 if ! declare -f error > /dev/null; then
@@ -59,11 +59,11 @@ if ! declare -f error > /dev/null; then
 fi
 
 if ! declare -f pass > /dev/null; then
-    function pass()  { printf '[+ PASS  ] %s\n' "${1}"; }
+    function pass() { printf '[+ PASS  ] %s\n' "${1}"; }
 fi
 
 if ! declare -f fail > /dev/null; then
-    function fail()  { printf '[- ERROR ] %s\n' "${1}"; }
+    function fail() { printf '[- ERROR ] %s\n' "${1}"; }
 fi
 
 if ! declare -f debug > /dev/null; then
@@ -71,8 +71,8 @@ if ! declare -f debug > /dev/null; then
 fi
 
 function die() {
-        error "$2"
-                            exit "$1"
+    error "$2"
+    exit "$1"
 }
 
 function validate_commands() {
@@ -130,9 +130,9 @@ function gather_info() {
 
     # d) ip route (best-effort if behind NAT this will give local IP)
     if [[ -z "${PUBLIC_IP}" ]] && command -v ip &> /dev/null; then
-        PUBLIC_IP=$(ip route get 1.1.1.1 2> /dev/null \
-            | awk '/src/ { for(i=1;i<=NF;i++) if ($i=="src") print $(i+1) }' \
-            | head -n1 || true)
+        PUBLIC_IP=$(ip route get 1.1.1.1 2> /dev/null |
+            awk '/src/ { for(i=1;i<=NF;i++) if ($i=="src") print $(i+1) }' |
+            head -n1 || true)
     fi
 
     # e) Prompt if still empty
@@ -303,7 +303,7 @@ function setup_postfix() {
     postmap /etc/postfix/header_checks || die 13
     # mail aliases for postmaster & tlsrpt
     grep -q '^postmaster:' /etc/aliases || echo "postmaster:    postmaster@${DOMAIN}" >> /etc/aliases
-    grep -q '^tlsrpt:' /etc/aliases    || echo "tlsrpt:       postmaster@${DOMAIN}" >> /etc/aliases
+    grep -q '^tlsrpt:' /etc/aliases || echo "tlsrpt:       postmaster@${DOMAIN}" >> /etc/aliases
     newaliases || die 14 "newaliases failed"
     systemctl restart postfix
     pass "Postfix running with aliases"
@@ -379,22 +379,22 @@ function check_reputation() {
         ix.dnsbl.manitu.net
     )
     declare -A rbl_removal=(
-               [zen.spamhaus.org]="https://check.spamhaus.org/removal/"
-               [sbl.spamhaus.org]="https://check.spamhaus.org/removal/"
-               [xbl.spamhaus.org]="https://check.spamhaus.org/removal/"
-               [pbl.spamhaus.org]="https://check.spamhaus.org/removal/"
-               [b.barracudacentral.org]="https://www.barracudanetworks.com/support/knowledgebase/100227.htm"
-               [bl.spamcop.net]="https://www.spamcop.net/bl.shtml"
-               [cbl.abuseat.org]="https://cbl.abuseat.org/removal.html"
-               [dnsbl.sorbs.net]="https://www.sorbs.net/lookup.shtml"
-               [dnsbl - 1.uceprotect.net]="mailto:uceprotect@uceprotect.net"
-               [dnsbl - 2.uceprotect.net]="mailto:uceprotect@uceprotect.net"
-               [dnsbl - 3.uceprotect.net]="mailto:uceprotect@uceprotect.net"
-               [psbl.surriel.com]="https://psbl.surriel.com/removal/"
-               [spamrbl.imp.ch]="https://imp.ch/spamrbl/"
-               [db.wpbl.info]="http://db.wpbl.info/?ADDR=${ip}"
-               [bl.mailspike.net]="https://www.mailspike.net/lookup"
-               [ix.dnsbl.manitu.net]="mailto:dnsbl@manitu.net"
+        [zen.spamhaus.org]="https://check.spamhaus.org/removal/"
+        [sbl.spamhaus.org]="https://check.spamhaus.org/removal/"
+        [xbl.spamhaus.org]="https://check.spamhaus.org/removal/"
+        [pbl.spamhaus.org]="https://check.spamhaus.org/removal/"
+        [b.barracudacentral.org]="https://www.barracudanetworks.com/support/knowledgebase/100227.htm"
+        [bl.spamcop.net]="https://www.spamcop.net/bl.shtml"
+        [cbl.abuseat.org]="https://cbl.abuseat.org/removal.html"
+        [dnsbl.sorbs.net]="https://www.sorbs.net/lookup.shtml"
+        [dnsbl - 1.uceprotect.net]="mailto:uceprotect@uceprotect.net"
+        [dnsbl - 2.uceprotect.net]="mailto:uceprotect@uceprotect.net"
+        [dnsbl - 3.uceprotect.net]="mailto:uceprotect@uceprotect.net"
+        [psbl.surriel.com]="https://psbl.surriel.com/removal/"
+        [spamrbl.imp.ch]="https://imp.ch/spamrbl/"
+        [db.wpbl.info]="http://db.wpbl.info/?ADDR=${ip}"
+        [bl.mailspike.net]="https://www.mailspike.net/lookup"
+        [ix.dnsbl.manitu.net]="mailto:dnsbl@manitu.net"
     )
 
     local surbls=(
@@ -409,15 +409,15 @@ function check_reputation() {
         phishing.uribl.com
     )
     declare -A surbl_removal=(
-               [multi.surbl.org]="https://www.surbl.org/delisting-request"
-               [ab.surbl.org]="https://www.surbl.org/delisting-request"
-               [wsbl.surbl.org]="https://www.surbl.org/delisting-request"
-               [ph.surbl.org]="https://www.surbl.org/delisting-request"
-               [rhsbl.surbl.org]="https://www.surbl.org/delisting-request"
-               [uribl.spamhaus.org]="https://uribl.spamhaus.org/removal/"
-               [black.uribl.com]="https://uribl.com/delisting-request"
-               [malware.uribl.com]="https://uribl.com/delisting-request"
-               [phishing.uribl.com]="https://uribl.com/delisting-request"
+        [multi.surbl.org]="https://www.surbl.org/delisting-request"
+        [ab.surbl.org]="https://www.surbl.org/delisting-request"
+        [wsbl.surbl.org]="https://www.surbl.org/delisting-request"
+        [ph.surbl.org]="https://www.surbl.org/delisting-request"
+        [rhsbl.surbl.org]="https://www.surbl.org/delisting-request"
+        [uribl.spamhaus.org]="https://uribl.spamhaus.org/removal/"
+        [black.uribl.com]="https://uribl.com/delisting-request"
+        [malware.uribl.com]="https://uribl.com/delisting-request"
+        [phishing.uribl.com]="https://uribl.com/delisting-request"
     )
 
     info "Checking IP ${ip} against ${#rbls[@]} RBLs…"

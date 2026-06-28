@@ -19,9 +19,9 @@ IFS=$'\n\t'
 # Module dependencies (adjust as needed)
 script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 source "${script_dir}/common_utils.sh"
-source "${script_dir}/dns_utils.sh"  2> /dev/null || true
+source "${script_dir}/dns_utils.sh" 2> /dev/null || true
 source "${script_dir}/smtp_utils.sh" 2> /dev/null || true
-source "${script_dir}/web_utils.sh"  2> /dev/null || true
+source "${script_dir}/web_utils.sh" 2> /dev/null || true
 source "${script_dir}/cloud_surface_utils.sh" 2> /dev/null || true
 source "${script_dir}/json_utils.sh" 2> /dev/null || true
 
@@ -65,10 +65,10 @@ function check_sharepoint() {
 
     if [[ -n "${prefix_file}" && -r "${prefix_file}" ]]; then
         while IFS= read -r p; do
-            [[ -z "$p" ]] && continue              # skip blank lines
-            [[ "$p" =~ ^[[:space:]]*# ]] && continue  # skip comments
-            cand+=("$p")
-        done < "$prefix_file"
+            [[ -z "${p}" ]] && continue                # skip blank lines
+            [[ "${p}" =~ ^[[:space:]]*# ]] && continue # skip comments
+            cand+=("${p}")
+        done < "${prefix_file}"
     fi
 
     # Dedup
@@ -76,9 +76,9 @@ function check_sharepoint() {
     local -a uniq=()
     for p in "${cand[@]}"; do
         [[ -z "${p}" ]] && continue
-        if [[ -z "${seen[$p]+x}" ]]; then
-            uniq+=("$p")
-            seen[$p]=1
+        if [[ -z "${seen[${p}]+x}" ]]; then
+            uniq+=("${p}")
+            seen[${p}]=1
         fi
     done
     cand=("${uniq[@]}")
@@ -91,13 +91,13 @@ function check_sharepoint() {
         local url="$1"
         # force headers fetch, silence stderr to avoid noisy DNS/SSL logs
         local hdr
-        hdr="$(curl -sI -m 7 -A "${CURL_UA}" "$url" 2> /dev/null || true)"
+        hdr="$(curl -sI -m 7 -A "${CURL_UA}" "${url}" 2> /dev/null || true)"
         local code
-        code="$(printf '%s\n' "$hdr" | awk 'NR==1{print $2}')"
-        if printf '%s' "$hdr" | grep -qiE '^www-authenticate:\s*Bearer\b'; then
-            printf '%s|true|%s\n' "${code:-0}" "$hdr"
+        code="$(printf '%s\n' "${hdr}" | awk 'NR==1{print $2}')"
+        if printf '%s' "${hdr}" | grep -qiE '^www-authenticate:\s*Bearer\b'; then
+            printf '%s|true|%s\n' "${code:-0}" "${hdr}"
         else
-            printf '%s|false|%s\n' "${code:-0}" "$hdr"
+            printf '%s|false|%s\n' "${code:-0}" "${hdr}"
         fi
     }
 
@@ -106,30 +106,30 @@ function check_sharepoint() {
         local od_host="${t}-my.sharepoint.com"
 
         # Only probe hosts that resolve
-        if resolve_host "$sp_host"; then
+        if resolve_host "${sp_host}"; then
             local r
             IFS='|' read -r sp_code sp_bearer _ < <(head_with_bearer "https://${sp_host}/_vti_bin/client.svc")
         fi
-        if resolve_host "$od_host"; then
+        if resolve_host "${od_host}"; then
             local r2
             IFS='|' read -r od_code od_bearer _ < <(head_with_bearer "https://${od_host}/_vti_bin/client.svc")
         fi
 
-        if [[ "$sp_bearer" == "true" || "$od_bearer" == "true" ]]; then
-            confirmed="$t"
+        if [[ "${sp_bearer}" == "true" || "${od_bearer}" == "true" ]]; then
+            confirmed="${t}"
             break
         fi
     done
 
     jq -n \
         --argjson tested "$(printf '%s\n' "${cand[@]}" | jq -R . | jq -s .)" \
-        --arg conf "$confirmed" \
+        --arg conf "${confirmed}" \
         --arg spu "https://${confirmed:-${cand[0]}}.sharepoint.com/_vti_bin/client.svc" \
         --arg odu "https://${confirmed:-${cand[0]}}-my.sharepoint.com/_vti_bin/client.svc" \
-        --arg spc "$sp_code" \
-        --arg odc "$od_code" \
-        --arg spb "$sp_bearer" \
-        --arg odb "$od_bearer" \
+        --arg spc "${sp_code}" \
+        --arg odc "${od_code}" \
+        --arg spb "${sp_bearer}" \
+        --arg odb "${od_bearer}" \
         '{
          sharepoint: {
            tested_prefixes: $tested,
@@ -185,7 +185,7 @@ function check_teams_presence() {
 
     local lync_valid=false sip_valid=false
     [[ -n "${lync_cname}" ]] && [[ "${lync_cname,,}" == *"webdir.online.lync.com."* || "${lync_cname,,}" == *"webdir.online.lync.com"* ]] && lync_valid=true
-    [[ -n "${sip_cname}"  ]] && [[ "${sip_cname,,}" == *"sipdir.online.lync.com."* || "${sip_cname,,}" == *"sipdir.online.lync.com"*     ]] && sip_valid=true
+    [[ -n "${sip_cname}" ]] && [[ "${sip_cname,,}" == *"sipdir.online.lync.com."* || "${sip_cname,,}" == *"sipdir.online.lync.com"* ]] && sip_valid=true
 
     local portal="https://teams.microsoft.com"
     local code
@@ -249,21 +249,21 @@ function check_b2c_configuration() {
     fi
     # Dedup
     local -A seen=()
-                      local -a uniq=()
+    local -a uniq=()
     for t in "${tenants[@]}"; do
         [[ -z "${t}" ]] && continue
-        if [[ -z "${seen[$t]+x}" ]]; then
-            uniq+=("$t")
-            seen[$t]=1
+        if [[ -z "${seen[${t}]+x}" ]]; then
+            uniq+=("${t}")
+            seen[${t}]=1
         fi
     done
     tenants=("${uniq[@]}")
 
     # Cloud base hostname
     case "${cloud,,}" in
-        us) local host_tmpl='%s.b2clogin.com' ;;   # AAD B2C in Azure Gov often still uses b2clogin.com, but realm detection is safer
+        us) local host_tmpl='%s.b2clogin.com' ;; # AAD B2C in Azure Gov often still uses b2clogin.com, but realm detection is safer
         cn) local host_tmpl='%s.b2clogin.cn' ;;
-        *)  local host_tmpl='%s.b2clogin.com' ;;  # public
+        *) local host_tmpl='%s.b2clogin.com' ;; # public
     esac
 
     # Common policy names to try (best-effort)
@@ -277,13 +277,15 @@ function check_b2c_configuration() {
 
     for tenant in "${tenants[@]}"; do
         # host is built from the *tenant label without suffix* when provided in long form
-        local label="${tenant%%.*}"  # "contoso" from "contoso.onmicrosoft.com"
+        local label="${tenant%%.*}" # "contoso" from "contoso.onmicrosoft.com"
         local host
+        # shellcheck disable=SC2059  # intentional: host_tmpl is a printf format template provided by the caller
         printf -v host "${host_tmpl}" "${label}"
 
         for pol in "${policies[@]}"; do
             for pat in "${patterns[@]}"; do
                 local path
+                # shellcheck disable=SC2059  # intentional: pat is a printf format template from the patterns array
                 printf -v path "${pat}" "https://${host}" "${tenant}" "${pol}"
 
                 local code
@@ -552,27 +554,33 @@ function do_saas_idp_probe() {
 
     # Temp file to collect one-JSON-per-line
     local outfile
-                   outfile="$(mktemp)"
+    outfile="$(mktemp)"
     : > "${outfile}"
 
+    # SC2016 disabled for this block: the single-quoted `bash -c '...'` body
+    # is intentional so that $u / $code are expanded by the inner shell (one
+    # per xargs slot via "$1"), not by the outer shell. The single-quoted jq
+    # filters are intentional so that $u / $c are jq variable references,
+    # not shell expansions.
+    # shellcheck disable=SC2016
     if command -v xargs > /dev/null 2>&1; then
-        printf '%s\n' "${urls[@]}" \
-                                   | xargs -P 8 -n 1 -I {} bash -c '
-            u="$1"
-            code=$(curl -s -o /dev/null -w "%{http_code}" -m 6 --retry 0 -A "${CURL_UA}" "$u" 2>/dev/null || true)
-            # SINGLE-QUOTED jq program so $u/$c are jq vars, not shell
-            jq -n --arg u "$u" --arg c "$code" '"'"'{url:$u, status:($c|tonumber? // 0)}'"'"'
-        ' _ {} >> "${outfile}"
+        printf '%s\n' "${urls[@]}" |
+            xargs -P 8 -n 1 -I {} bash -c '
+                u="$1"
+                code=$(curl -s -o /dev/null -w "%{http_code}" -m 6 --retry 0 -A "${CURL_UA}" "$u" 2>/dev/null || true)
+                jq -n --arg u "$u" --arg c "$code" '"'"'{url:$u, status:($c|tonumber? // 0)}'"'"'
+            ' _ {} >> "${outfile}"
     else
         for u in "${urls[@]}"; do
-            code="$(curl -s -o /dev/null -w '%{http_code}' -m 6 --retry 0 -A "${CURL_UA}" "$u" 2> /dev/null || true)"
-            jq -n --arg u "$u" --arg c "$code" '{url:$u, status:($c|tonumber? // 0)}' >> "${outfile}"
+            code="$(curl -s -o /dev/null -w '%{http_code}' -m 6 --retry 0 -A "${CURL_UA}" "${u}" 2> /dev/null || true)"
+            # shellcheck disable=SC2016  # jq filter intentionally single-quoted
+            jq -n --arg u "${u}" --arg c "${code}" '{url:$u, status:($c|tonumber? // 0)}' >> "${outfile}"
         done
     fi
 
     # Aggregate
     local arr
-               arr="$(jq -s '.' < "${outfile}")"
+    arr="$(jq -s '.' < "${outfile}")"
     rm -f "${outfile}" 2> /dev/null || true
 
     jq -n --argjson r "${arr}" '{ saas_idp: { probes: $r } }'

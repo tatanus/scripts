@@ -46,11 +46,11 @@ fi
 
 # Fallback logging if not provided by logger.sh
 if ! declare -f info > /dev/null; then
-    function info()  { printf '[* INFO  ] %s\n' "${1}"; }
+    function info() { printf '[* INFO  ] %s\n' "${1}"; }
 fi
 
 if ! declare -f warn > /dev/null; then
-    function warn()  { printf '[! WARN  ] %s\n' "${1}"; }
+    function warn() { printf '[! WARN  ] %s\n' "${1}"; }
 fi
 
 if ! declare -f error > /dev/null; then
@@ -58,11 +58,11 @@ if ! declare -f error > /dev/null; then
 fi
 
 if ! declare -f pass > /dev/null; then
-    function pass()  { printf '[+ PASS  ] %s\n' "${1}"; }
+    function pass() { printf '[+ PASS  ] %s\n' "${1}"; }
 fi
 
 if ! declare -f fail > /dev/null; then
-    function fail()  { printf '[- ERROR ] %s\n' "${1}"; }
+    function fail() { printf '[- ERROR ] %s\n' "${1}"; }
 fi
 
 if ! declare -f debug > /dev/null; then
@@ -83,7 +83,7 @@ function validate_commands() {
             missing=1
         fi
     done
-    ((missing == 0))   || die 1 "One or more required commands are missing."
+    ((missing == 0)) || die 1 "One or more required commands are missing."
 }
 
 #==============================================================================
@@ -124,9 +124,9 @@ function gather_info() {
 
     # 3d) ip route (best-effort if behind NAT this will give local IP)
     if [[ -z "${PUBLIC_IP}" ]] && command -v ip &> /dev/null; then
-        PUBLIC_IP=$(ip route get 1.1.1.1 2> /dev/null \
-            | awk '/src/ { for(i=1;i<=NF;i++) if ($i=="src") print $(i+1) }' \
-            | head -n1 || true)
+        PUBLIC_IP=$(ip route get 1.1.1.1 2> /dev/null |
+            awk '/src/ { for(i=1;i<=NF;i++) if ($i=="src") print $(i+1) }' |
+            head -n1 || true)
     fi
 
     # 3e) Prompt if still empty
@@ -184,8 +184,8 @@ function obtain_certs() {
         --manual-public-ip-logging-ok --agree-tos \
         --register-unsafely-without-email \
         --server https://acme-v02.api.letsencrypt.org/directory \
-        -d "${NEW_FQDN}" \
-        || die 5 "Certbot issuance failed for ${NEW_FQDN}"
+        -d "${NEW_FQDN}" ||
+        die 5 "Certbot issuance failed for ${NEW_FQDN}"
 
     CERT_DIR="/etc/letsencrypt/live/${NEW_FQDN}"
     [[ -d "${CERT_DIR}" ]] || die 6 "Certificate directory ${CERT_DIR} not found"
@@ -199,8 +199,8 @@ function generate_dkim_key() {
     info "Generating new DKIM key for ${NEW_DOMAIN}"
     DKIM_DIR="/etc/opendkim/keys/${NEW_DOMAIN}"
     mkdir -p "${DKIM_DIR}" || die 7 "Failed to create DKIM directory"
-    opendkim-genkey -s default -d "${NEW_DOMAIN}" -D "${DKIM_DIR}" \
-        || die 8 "DKIM key generation failed"
+    opendkim-genkey -s default -d "${NEW_DOMAIN}" -D "${DKIM_DIR}" ||
+        die 8 "DKIM key generation failed"
     chown -R opendkim:opendkim "${DKIM_DIR}" || die 9 "DKIM key ownership failed"
 
     local pub
@@ -242,10 +242,10 @@ EOF
 #==============================================================================
 function update_aliases() {
     info "Updating mail aliases"
-    grep -q '^postmaster:' /etc/aliases \
-        || echo "postmaster:    postmaster@${NEW_DOMAIN}" >> /etc/aliases
-    grep -q '^tlsrpt:' /etc/aliases \
-        || echo "tlsrpt:       postmaster@${NEW_DOMAIN}" >> /etc/aliases
+    grep -q '^postmaster:' /etc/aliases ||
+        echo "postmaster:    postmaster@${NEW_DOMAIN}" >> /etc/aliases
+    grep -q '^tlsrpt:' /etc/aliases ||
+        echo "tlsrpt:       postmaster@${NEW_DOMAIN}" >> /etc/aliases
 
     newaliases || die 12 "newaliases command failed"
     pass "Aliases updated"
@@ -296,8 +296,8 @@ EOF
 function reload_services() {
     info "Reloading Postfix and OpenDKIM"
     for svc in postfix opendkim; do
-        systemctl reload "${svc}" \
-            || die 14 "Failed reloading ${svc}"
+        systemctl reload "${svc}" ||
+            die 14 "Failed reloading ${svc}"
     done
     pass "Services reloaded"
 }
