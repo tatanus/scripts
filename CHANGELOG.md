@@ -8,6 +8,8 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+## [2026.06.28.0] - 2026-06-28
+
 ### Added
 
 - `install.sh` (new, ~250 lines). Deploys `bash/` and `python/` into
