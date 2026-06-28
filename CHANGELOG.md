@@ -8,6 +8,109 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+### Added
+
+- `install.sh` (new, ~250 lines). Deploys `bash/` and `python/` into
+  `${HOME}/DATA/TOOLS/SCRIPTS/{bash,python}/`, creating the target
+  directory and parents if missing. install / update / uninstall
+  subcommands; checksum-skip-unchanged on update; `--dry-run`,
+  `--force`, `--quiet` flags. Preflight refuses to run unless
+  common_core is installed at the documented system path AND
+  bash_setup has deployed `${HOME}/.bashrc`.
+- `Makefile` rewritten to parity with common_core / bash_setup /
+  pentest_setup: 4-part `SEMVER_RE`, `make fmt-check`, non-mutating
+  `make ci`, `make release V=…`, `make release-today`, `make style`.
+  `make test` target now finds bats files under subdirectories via
+  `find` (was `ls tests/*.bats`).
+- `CHANGELOG.md` (this file).
+- `.github/workflows/main.yml` rewritten to mirror the standard CI
+  workflow in the other three repos (shellcheck + pinned shfmt v3.8.0
+  + bats; runs `make lint`, `make fmt-check`, `make test`).
+- `tools/check_bash_style.sh`, copied from common_core (was referenced
+  by the new Makefile but not present in this repo). Bonus: extended
+  the backtick check to skip backslash-escaped backticks (`\\\``),
+  which are markdown formatting in heredocs that emit READMEs.
+- BATS coverage for `install.sh` under `tests/independent/`:
+  - `10_smoke.bats` (5 tests): arg parsing, `--help`, `--version`,
+    preflight failures when common_core / bash_setup is absent.
+  - `20_lifecycle.bats` (10 tests): end-to-end install / update /
+    uninstall round-trip in a sandbox HOME.
+  - `30_repo_structure.bats` (8 tests): repo invariants.
+  - `tests/independent/helpers/common.bash`: shared helper that
+    drops a real (or mock) common_core into the sandbox HOME and
+    stubs a `.bashrc`.
+
+### Changed
+
+- **README rewritten end-to-end.** The previous version documented a
+  fictional `scripts/` directory containing only `logger.sh` and
+  `safe_source.sh`, ignored the actual `bash/` + `python/` +
+  `bash/recon/` layout, and had a `tatanus/BASH` typo in the
+  Last-Commit badge. New README mirrors the bash_setup / pentest_setup
+  structure.
+- Moved `policy/CODE_OF_CONDUCT.md`, `policy/CONTRIBUTING.md`,
+  `policy/SECURITY.md` to `.github/` (their standard location).
+  `policy/` directory removed.
+- Rewrote `.github/CONTRIBUTING.md` using the common_core template
+  (the previous version was the same `BASH`-placeholder /
+  `-bn -kp` shfmt / `set -euo pipefail` drift I fixed earlier for
+  common_core).
+
+### Fixed
+
+- All **156 ShellCheck findings** in the bash tree cleared:
+  - **79 SC2250** brace-quoting (`$var` → `${var}`) auto-applied via
+    `shellcheck -f diff | patch -p1`.
+  - **9 SC2329** trap-handler `cleanup()` functions: per-line disable
+    with rationale (invoked via `trap cleanup EXIT`).
+  - **4 SC2249** missing default case: added `*) : ;;` or
+    `*) warn ... ;;` arms.
+  - **3 SC2155** declare-and-assign-separately: split
+    `local x="$(...)"` into `local x; x="$(...)"` so the inner
+    command's exit status is not masked by `local`.
+  - **3 SC2016** single-quoted expressions: per-line / per-block
+    disable with rationale (jq filter strings, xargs-passed
+    `bash -c` body — both intentional).
+  - **2 SC2126** `grep | wc -l` → `grep -c` real refactor.
+  - **2 SC2059** printf with variable format string: per-line disable
+    with rationale (the format string is a deliberate template).
+  - **2 SC1112** unicode quote: replaced. (In `json_utils.sh`, the
+    U+2019 apostrophe was inside a `jq -s '...'` single-quoted string
+    deliberately so the outer quotes would not close; rewrote the
+    comment to use "do not" instead.)
+  - **1 SC2153** false positive (`TARGETS_FILE` env-global vs
+    `targets_file` local are intentionally different identifiers).
+  - **1 SC2004** redundant `${}` in arithmetic: removed.
+  - **1 SC2001** sed-could-be-PE: per-line disable (bash parameter
+    expansion does not support character classes).
+- `echo -e "..."` → `printf '%b\n' "..."` across 35 sites in
+  `setup_engagement.sh`, `wireless.sh`, `smtp_utils.sh`. CLAUDE.md
+  bans `echo -e`. Verified semantically identical against the ANSI
+  color globals these scripts use.
+- `set -euo pipefail` → `set -uo pipefail` in `mount-try.sh`,
+  `auto-mount-shares.sh`, `gophish_install.sh`. The `-e` (errexit)
+  is banned by CLAUDE.md project-wide.
+
+### Removed
+
+- Root `compile.sh` (~170 lines). Used banned `set -Eeuo pipefail`,
+  referenced a (also-removed) `lib/common_core` submodule that was
+  never actually registered, and overlapped with `make ci` /
+  `make release-today` from the new Makefile.
+- `.gitmodules`. Declared `lib/common_core` but had no `path` /
+  `url` and no gitlink in the index. Dead debris.
+- `policy/LICENSE` and `docs/LICENSE`. The repo had **three** LICENSE
+  files (root, policy/, docs/) that differed only in the copyright
+  year. Kept the root copy (2025); deleted the other two.
+
+### Verification
+
+- `make ci` (fmt-check + lint + bats) — all green.
+- `make lint` — 0 findings (was 156 pre-cleanup).
+- `make fmt-check` — clean.
+- `make test` — 23 passing, 0 failing.
+- `make style` — "All Bash scripts passed style checks."
+
 ## [0.0.1]
 
 ### Note
