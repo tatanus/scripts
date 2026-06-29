@@ -8,6 +8,8 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+## [2026.06.29.0] - 2026-06-29
+
 ### Changed
 
 - `.shellcheckrc` synced to the canonical 108-line version used by
