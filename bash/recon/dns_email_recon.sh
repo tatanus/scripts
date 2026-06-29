@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2154
+# Rationale: CURL_UA is sourced from the external recon-suite config
+# (run_external_recon_suite.sh defines and exports it before invoking
+# this module). ShellCheck cannot follow that load chain.
 
 # Strict mode (manual error handling; no `-e`)
 set -uo pipefail

@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
+# Rationale: `light_blue` is a reserved color in the palette (kept for
+# parity with bash_setup's logger and for future log-level expansion).
+# `caller_info` in _log() captures the caller for the debug breadcrumb
+# block; the variable is read by the format string via indirect
+# expansion that ShellCheck cannot follow.
 
 # =============================================================================
 # NAME        : logger.sh

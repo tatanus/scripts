@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
+# Rationale: ERR_MISSING_DEPS / CONFIG_DIR are top-level constants
+# exported for use by the task scripts under tasks/. ShellCheck does
+# not see those downstream consumers.
 
 ###############################################################################
 # NAME         : run_external_recon_suite.sh

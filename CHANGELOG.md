@@ -8,6 +8,44 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+### Changed
+
+- `.shellcheckrc` synced to the canonical 108-line version used by
+  `common_core`, `bash_setup`, and `pentest_setup`. Brings the
+  block-commented rule taxonomy (severity=style, bash-version=4,
+  enforced safety rules, controlled deviations, modern-Bash enables,
+  security foot-gun rules, function-semantics policy) in line with
+  the rest of the stack. All four repos now share a byte-identical
+  `.shellcheckrc`.
+- `bash/recon/setup_engagement.sh`: replaced the
+  `mkdir -p …` + `if [[ $? -eq 0 ]]; then` pattern with the
+  `if mkdir -p …; then` form (SC2181).
+
+### Fixed
+
+- `bash/wireless.sh:401`: the rename-failure `warn` message
+  interpolated `${mon_iface}`, but that variable does not exist in
+  scope at that point. The intended variable was `${base_iface}`
+  (the target name the rename is trying to set). Corrected; the
+  diagnostic now prints the actual target name on failure.
+
+### Internal
+
+- File-level `# shellcheck disable=` headers (with rationale) added
+  to recon-suite modules and other one-off scripts so the canonical
+  `.shellcheckrc` does not surface 33 expected SC2034 / SC2154
+  findings. Affected files: `bash/logger.sh`,
+  `bash/auto-mount-shares.sh`, `bash/setup-mail-server.sh`,
+  `bash/update_gophish.sh`, `bash/recon/common_utils.sh`,
+  `bash/recon/dns_email_recon.sh`, `bash/recon/entra_azure_recon.sh`,
+  `bash/recon/m365_recon_NG.sh`, `bash/recon/services_recon.sh`,
+  `bash/recon/run_external_recon_suite.sh`,
+  `bash/recon/tasks/00-validate.sh`, `bash/recon/tasks/01-osint.sh`,
+  `bash/recon/tasks/02-nmap.sh`, `bash/recon/tasks/03-http-scan.sh`,
+  `bash/recon/tasks/04-testssl.sh`. Each disable cites the
+  load-chain reason (e.g. CURL_UA / ENGAGEMENT_DIR are exported by
+  the recon-suite orchestrator before invocation).
+
 ## [2026.06.28.0] - 2026-06-28
 
 ### Added

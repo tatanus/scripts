@@ -77,9 +77,7 @@ main() {
 
     # Create directory structure
     printf '%b\n' "${BLUE}[*]${NC} Creating directory structure..."
-    mkdir -p "${engagement_dir}"/{RECON,OUTPUT/TEE,LOGS}
-
-    if [[ $? -eq 0 ]]; then
+    if mkdir -p "${engagement_dir}"/{RECON,OUTPUT/TEE,LOGS}; then
         printf '%b\n' "${GREEN}[✓]${NC} Directory structure created"
     else
         printf '%b\n' "${RED}[✗]${NC} Failed to create directory structure"

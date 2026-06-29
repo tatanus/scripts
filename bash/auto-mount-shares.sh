@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
+# Rationale: TOTAL_HOSTS is a top-level counter incremented in helper
+# functions through indirect expansion; `current_host` / `timestamp`
+# are destructured loop variables intentionally kept for column
+# alignment in the read pattern, even when a specific iteration does
+# not use every column.
+
 ###############################################################################
 # auto-mount-shares.sh - Automated Share Discovery and Mounting
 #==============================

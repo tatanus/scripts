@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
+# Rationale: CONTACT_EMAIL is a top-level user-tunable constant that is
+# substituted into config templates by helper functions ShellCheck does
+# not follow.
 
 ###############################################################################
 # NAME         : setup-mail-server.sh

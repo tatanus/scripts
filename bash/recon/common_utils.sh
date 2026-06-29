@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
+# Rationale: `light_blue` is a reserved palette entry kept in parity
+# with bash_setup's logger. `need_http` / `need_json` / `need_timeout`
+# are dependency-check sentinels read by helper functions through
+# indirect expansion that ShellCheck cannot follow.
 
 # Strict mode (manual error handling; no `-e`)
 set -uo pipefail

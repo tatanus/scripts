@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
+# Rationale: CONFIG_FILE / CONFIG_DIR are top-level constants referenced
+# inside helper functions ShellCheck does not follow.
 
 ###############################################################################
 # NAME         : gophish_change_domain.sh

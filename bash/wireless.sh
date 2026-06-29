@@ -398,7 +398,7 @@ function disable_monitor() {
     if [[ "${INTERFACE}" == *mon ]]; then
         base_iface="${INTERFACE%mon}"
         ip link set dev "${INTERFACE}" name "${base_iface}" || {
-            warn "Failed to rename '${INTERFACE}' to '${mon_iface}'"
+            warn "Failed to rename '${INTERFACE}' to '${base_iface}'"
             return 1
         }
     fi

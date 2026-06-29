@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2154
+# Rationale: ENGAGEMENT_DIR is exported by the recon-suite orchestrator
+# (run_external_recon_suite.sh) before any task script is invoked.
+# ShellCheck cannot follow that load chain.
 
 ###############################################################################
 # TASK: 02-nmap
