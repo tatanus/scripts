@@ -8,6 +8,20 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+### Added
+
+- `python/azure_tenant_enum.py` — resolve a DNS domain against Azure AD /
+  Entra ID via public, unauthenticated Microsoft endpoints to recover the
+  tenant GUID, federation brand / company name, and namespace type; also
+  identifies any domains supplied via `-f/--file`. Outputs text, JSON, or
+  CSV (`-F`), to stdout or a file (`-o`). Marked executable to match the
+  other CLI tools in `python/`.
+  - Documents a known limitation: Microsoft has curtailed the Autodiscover
+    `GetFederationInformation` endpoint, which now typically returns only the
+    queried domain rather than the tenant's full domain list, so the derived
+    `*.onmicrosoft.com` tenant name is usually unavailable. Tenant GUID,
+    brand, and namespace type remain reliable.
+
 ## [2026.08.26.0] - 2026-08-26
 
 ### Added
