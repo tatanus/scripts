@@ -75,6 +75,11 @@ copy.
 │   ├── mount-try.sh            # mount with backoff
 │   ├── logger.sh               # structured logging (see docs/LOGGER_README.md)
 │   ├── safe_source.sh          # safe re-sourcing helper (see docs/SAFE_SOURCE_README.md)
+│   ├── internal/               # internal penetration-test suite (see bash/internal/README.md)
+│   │   ├── run_internal_pentest.sh   # task-based orchestrator (auto-discovers tasks/)
+│   │   ├── internal_lib.sh           # common_core bootstrap + DATA/ paths + helpers
+│   │   ├── config/default.conf       # overridable paths / tunables / task toggles
+│   │   └── tasks/                    # 00-validate … 09-netexec (drop in NN-name.sh)
 │   └── recon/                  # external reconnaissance mini-framework
 │       ├── FRAMEWORK_OVERVIEW.md
 │       ├── README_RECON_SUITE.md
@@ -92,6 +97,7 @@ copy.
 │       └── examples/
 ├── python/                     # standalone Python utilities
 │   ├── ad_dns_enum.py          # Active Directory DNS enumeration
+│   ├── azure_tenant_enum.py    # Azure AD tenant/domain/company enumeration
 │   ├── crypto_utils.py
 │   ├── dhcp_enum.py
 │   ├── EvilWinRM.py
@@ -120,6 +126,11 @@ copy.
 - `bash/recon/` — see its own [`FRAMEWORK_OVERVIEW.md`](bash/recon/FRAMEWORK_OVERVIEW.md)
   and [`README_RECON_SUITE.md`](bash/recon/README_RECON_SUITE.md).
 - `bash/recon/m365_recon_NG.sh` — see [`docs/M365_RECON_NG.md`](docs/M365_RECON_NG.md).
+- `bash/internal/` — modular internal penetration-test suite (spoonmap →
+  Metasploit → gowitness/httpx/nuclei → NetExec). See its own
+  [`README.md`](bash/internal/README.md). It consumes tools and MSF
+  resource scripts deployed by `pentest_setup` at runtime (resolved by
+  path, degrading gracefully when a tool is absent).
 
 ### What's not here
 

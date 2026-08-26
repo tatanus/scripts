@@ -8,6 +8,27 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+### Added
+
+- `bash/internal/` — modular **internal penetration-test suite**. A
+  task-based orchestrator (`run_internal_pentest.sh`) that auto-discovers
+  and runs the steps under `bash/internal/tasks/` in filename order:
+  validate/prompt for targets, iptables-block excludes, DNS + domain-
+  controller discovery, TrustedSec spoonmap scan, Metasploit `db_import`,
+  gowitness, httpx + nuclei, every `SCRIPTS/MSF/modules/*.rc`, and NetExec
+  (`nxc smb --pass-pol` / `nxc ldap`). Shared bootstrap, the `DATA/` path
+  layout and helpers live in `bash/internal/internal_lib.sh`; defaults are
+  overridable via `bash/internal/config/default.conf` or `--config`. New
+  steps drop in as `tasks/NN-name.sh` (defining `run_task_NN_name()`) with
+  no orchestrator edit. See [`bash/internal/README.md`](bash/internal/README.md).
+  - Reuses tools/artifacts deployed by `pentest_setup` at **runtime**
+    (spoonmap, the `SCRIPTS/MSF/` resource scripts, gowitness, httpx,
+    nuclei, netexec, metasploit) and follows the same `DATA/` layout as
+    `pentest_setup/config/config.sh`. This is a runtime tool dependency
+    resolved by path with graceful degradation when a tool is absent — not
+    a source-time load-order dependency, so the
+    `common_core → … → scripts → pentest_setup` contract is preserved.
+
 ## [2026.06.29.0] - 2026-06-29
 
 ### Changed
