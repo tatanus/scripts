@@ -8,6 +8,8 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+## [2026.08.26.0] - 2026-08-26
+
 ### Added
 
 - `bash/internal/` — modular **internal penetration-test suite**. A
