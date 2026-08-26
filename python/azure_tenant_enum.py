@@ -7,6 +7,28 @@
 #               endpoints. Any domains supplied via a file argument are each
 #               looked up the same way. Outputs text, JSON, or CSV.
 #
+#               For each domain it also reports the identity provider in front
+#               of the tenant (auth_provider: Okta, ADFS, Ping, OneLogin,
+#               Shibboleth, Duo, Google, or Entra-managed), derived from the
+#               federation AuthURL - this is unauthenticated.
+#
+#               OPTIONAL --mfa-test: assess MFA / authentication posture on a
+#               best-effort basis, degrading with the inputs supplied:
+#                 * -u USER -p PASS : full ROPC sign-in test across several
+#                   first-party clients; the AADSTS result reveals MFA
+#                   enforcement (AADSTS50076 = MFA required; a token = no MFA on
+#                   that endpoint) and inconsistent coverage (MFASweep).
+#                 * -u USER (no password) : unauthenticated GetCredentialType
+#                   probe - account existence, federated IdP, Seamless SSO,
+#                   has-password. MFA enforcement is NOT determinable this way.
+#                 * neither : domain-level posture only (see auth_provider).
+#
+#               AUTHORIZATION: --mfa-test authenticates against live Microsoft
+#               endpoints. Only use it against tenants/accounts you are
+#               explicitly authorized to test. It tests ONE account (it is not a
+#               password sprayer) and halts on smart-lockout, but attempts can
+#               still trigger sign-in alerts or lockout.
+#
 #               NOTE: The Autodiscover GetFederationInformation endpoint once
 #               returned the full set of domains registered to a tenant, but
 #               Microsoft has since curtailed it - it now typically returns only
@@ -24,10 +46,17 @@
 # 2026-08-26 00:00:00  | Claude       | Documented GetFederationInformation
 #                      |              | curtailment; output_text now writes to a
 #                      |              | stream; removed duplicate primary lookup.
+# 2026-08-26 00:00:00  | Claude       | Added identity-provider detection
+#                      |              | (auth_provider) and optional --mfa-test
+#                      |              | single-account MFA enforcement probe.
+# 2026-08-26 00:00:00  | Claude       | --mfa-test made best-effort: works with
+#                      |              | username-only (GetCredentialType probe)
+#                      |              | or no credentials (domain posture).
 # =============================================================================
 
 import argparse
 import csv
+import getpass
 import json
 import logging
 import re
@@ -84,6 +113,74 @@ SOAP_ACTION = (
 )
 
 # -----------------------------
+# Identity-Provider Classification
+# -----------------------------
+# Map substrings found in a federated domain's AuthURL to a friendly IdP name.
+# Order matters: more specific patterns first.
+IDP_PATTERNS = (
+    ("Okta", ("okta.com", "oktapreview.com", "okta-emea.com", "okta.")),
+    ("Microsoft ADFS", ("/adfs/ls",)),
+    ("Ping", ("pingone.com", "pingidentity.com", "ping-eng.com")),
+    ("OneLogin", ("onelogin.com",)),
+    ("Duo SSO", ("duosecurity.com",)),
+    ("Auth0", ("auth0.com",)),
+    ("Google", ("accounts.google.com",)),
+    ("CAS", ("/cas/login",)),
+    ("Centrify/Idaptive", ("my.centrify.com", "idaptive.app")),
+    ("Shibboleth", ("/idp/profile/saml2", "shibboleth")),
+)
+
+# -----------------------------
+# MFA Test (ROPC) Definitions
+# -----------------------------
+# Resource Owner Password Credentials sign-in endpoint (v1). A successful token
+# means the password alone was sufficient for that client/resource (an MFA gap);
+# an AADSTS error can indicate MFA is enforced. Testing several first-party
+# clients reveals inconsistent Conditional Access / MFA coverage (MFASweep).
+TOKEN_URL = f"{LOGIN_BASE}/common/oauth2/token"
+
+# Unauthenticated credential-type endpoint: reveals whether an account exists,
+# its federation redirect (IdP), and Seamless SSO - all without a password.
+CREDTYPE_URL = f"{LOGIN_BASE}/common/GetCredentialType"
+
+# (label, client_id, resource) - well-known public first-party clients.
+ROPC_CLIENTS = (
+    ("Azure AD Graph (AzureAD PowerShell)", "1b730954-1685-4b74-9bfd-dac224a7b894", "https://graph.windows.net"),
+    ("Azure Mgmt (Az PowerShell)", "1950a258-227b-4e31-a9cf-717495945fc2", "https://management.core.windows.net/"),
+    ("Microsoft Graph (Graph PowerShell)", "14d82eec-204b-4c2f-b7e8-296a70dab67e", "https://graph.microsoft.com"),
+    ("Exchange Online (Office)", "d3590ed6-52b3-4102-aeff-aad2292ab01c", "https://outlook.office365.com"),
+)
+
+AADSTS_RE = re.compile(r"AADSTS\d+")
+
+# Password correct, but a second factor / strong-auth policy stopped sign-in.
+MFA_ENFORCED_CODES = {
+    "AADSTS50076": "MFA required for this user",
+    "AADSTS50079": "MFA enrollment required",
+    "AADSTS50072": "User must enroll in MFA",
+    "AADSTS50074": "Strong authentication required",
+    "AADSTS50158": "External security challenge (Conditional Access / 3rd-party MFA)",
+    "AADSTS53004": "MFA enrollment required (Conditional Access)",
+}
+# Password correct, but blocked / limited for another reason (creds still valid).
+VALID_OTHER_CODES = {
+    "AADSTS50055": "Password expired",
+    "AADSTS50144": "On-prem password expired",
+    "AADSTS65001": "User or admin consent required",
+    "AADSTS53003": "Access blocked by Conditional Access policy",
+    "AADSTS50131": "Conditional Access (device/network) condition not met",
+    "AADSTS530003": "Device policy blocked sign-in",
+}
+INVALID_CODES = {"AADSTS50126": "Invalid username or password"}
+LOCKED_CODES = {"AADSTS50053": "Account locked / too many attempts (smart lockout)"}
+DISABLED_CODES = {"AADSTS50057": "Account is disabled"}
+NOTFOUND_CODES = {
+    "AADSTS50034": "User not found in tenant",
+    "AADSTS90002": "Tenant not found",
+    "AADSTS700016": "Client application not found in tenant",
+}
+
+# -----------------------------
 # Argument Parsing
 # -----------------------------
 def parse_args() -> argparse.Namespace:
@@ -118,10 +215,45 @@ def parse_args() -> argparse.Namespace:
         "-t", "--timeout", dest="timeout", type=float, default=15.0,
         help="Per-request HTTP timeout in seconds (default: 15)"
     )
+    mfa = parser.add_argument_group("MFA / auth test (best-effort; authorized use only)")
+    mfa.add_argument(
+        "--mfa-test", dest="mfa_test", action="store_true",
+        help="Assess MFA / auth posture. Best-effort: -u+-p runs a real sign-in "
+             "(MFA enforcement) test; -u alone runs an unauthenticated account "
+             "probe; neither reports domain-level posture only"
+    )
+    mfa.add_argument(
+        "-u", "--username", dest="username",
+        help="UPN to assess (e.g. user@example.com)"
+    )
+    mfa.add_argument(
+        "-p", "--password", dest="password",
+        help="Password for the full sign-in test (omit for no-password checks; "
+             "passing it here exposes it in shell history - prefer --prompt-password)"
+    )
+    mfa.add_argument(
+        "--prompt-password", dest="prompt_password", action="store_true",
+        help="Securely prompt for the password (avoids argv exposure) to run the "
+             "full sign-in test"
+    )
     args = parser.parse_args()
 
     if not DOMAIN_RE.match(args.domain):
         parser.error(f"Invalid domain format: {args.domain!r} (e.g. example.com)")
+
+    if args.mfa_test:
+        if args.prompt_password and not args.password:
+            if not args.username:
+                parser.error("--prompt-password requires -u/--username")
+            try:
+                args.password = getpass.getpass(f"Password for {args.username}: ")
+            except (EOFError, KeyboardInterrupt):
+                parser.error("password entry aborted")
+        if args.password and not args.username:
+            logging.warning(
+                "Password supplied without -u/--username; ignoring it and "
+                "running domain-level checks only."
+            )
 
     return args
 
@@ -269,6 +401,33 @@ def find_tenant_name(domains: List[str]) -> Optional[str]:
             return entry.rsplit(".onmicrosoft.com", 1)[0]
     return None
 
+def classify_auth_provider(namespace: str, auth_url: Optional[str]) -> str:
+    """Classify the identity provider fronting a domain's authentication.
+
+    Managed domains authenticate directly against Entra ID; Federated domains
+    redirect to an external IdP whose AuthURL reveals the product.
+
+    Args:
+        namespace (str): NameSpaceType from getuserrealm (Managed/Federated/...).
+        auth_url (Optional[str]): The federation AuthURL, if any.
+
+    Returns:
+        str: Friendly provider name (e.g. "Okta", "Microsoft ADFS",
+            "Entra (managed)"), or an "Unknown IdP" hint with the host.
+    """
+    if namespace == "Managed":
+        return "Entra (managed)"
+    if namespace != "Federated" or not auth_url:
+        return "Unknown"
+
+    low = auth_url.lower()
+    for name, patterns in IDP_PATTERNS:
+        if any(pat in low for pat in patterns):
+            return name
+
+    host = re.sub(r"^https?://", "", auth_url).split("/")[0]
+    return f"Federated (unknown IdP: {host})"
+
 def identify_company(
     session: requests.Session,
     domain: str,
@@ -291,6 +450,7 @@ def identify_company(
     namespace = realm.get("NameSpaceType", "Unknown")
     company = realm.get("FederationBrandName") or None
     cloud = realm.get("CloudInstanceName") or None
+    auth_url = realm.get("AuthURL") or None
 
     tenant_id: Optional[str] = None
     tenant_name: Optional[str] = None
@@ -313,7 +473,225 @@ def identify_company(
         "tenant_id": tenant_id,
         "tenant_name": tenant_name,
         "cloud_instance": cloud,
+        "auth_provider": classify_auth_provider(namespace, auth_url),
+        "auth_url": auth_url,
     }
+
+# -----------------------------
+# MFA Testing (active, authorized use only)
+# -----------------------------
+def classify_ropc_result(status_code: int, body: Dict) -> Dict[str, Optional[str]]:
+    """Interpret a ROPC token response into an MFA-relevant outcome.
+
+    Args:
+        status_code (int): HTTP status code of the token response.
+        body (Dict): Parsed JSON body (may be empty).
+
+    Returns:
+        Dict[str, Optional[str]]: {result, aadsts, detail}.
+    """
+    if body.get("access_token"):
+        return {
+            "result": "NO_MFA",
+            "aadsts": None,
+            "detail": "token issued with password alone (no MFA on this endpoint)",
+        }
+
+    desc = body.get("error_description", "") or ""
+    match = AADSTS_RE.search(desc)
+    code = match.group(0) if match else None
+    first_line = desc.splitlines()[0] if desc else (body.get("error") or "")
+
+    if code in MFA_ENFORCED_CODES:
+        return {"result": "MFA_ENFORCED", "aadsts": code, "detail": MFA_ENFORCED_CODES[code]}
+    if code in VALID_OTHER_CODES:
+        return {"result": "VALID_NO_TOKEN", "aadsts": code, "detail": VALID_OTHER_CODES[code]}
+    if code in LOCKED_CODES:
+        return {"result": "LOCKED", "aadsts": code, "detail": LOCKED_CODES[code]}
+    if code in DISABLED_CODES:
+        return {"result": "DISABLED", "aadsts": code, "detail": DISABLED_CODES[code]}
+    if code in INVALID_CODES:
+        return {"result": "INVALID_CREDS", "aadsts": code, "detail": INVALID_CODES[code]}
+    if code in NOTFOUND_CODES:
+        return {"result": "NOT_FOUND", "aadsts": code, "detail": NOTFOUND_CODES[code]}
+    return {"result": "UNKNOWN", "aadsts": code, "detail": first_line[:160]}
+
+def summarize_mfa(results: List[Dict]) -> str:
+    """Produce a one-line assessment from per-endpoint MFA results.
+
+    Args:
+        results (List[Dict]): Per-endpoint classification results.
+
+    Returns:
+        str: Human-readable assessment.
+    """
+    if any(r["result"] == "LOCKED" for r in results):
+        return "Account lockout encountered - results incomplete; stop testing this account."
+
+    no_mfa = [r for r in results if r["result"] == "NO_MFA"]
+    enforced = [r for r in results if r["result"] == "MFA_ENFORCED"]
+    valid = no_mfa + enforced + [r for r in results if r["result"] == "VALID_NO_TOKEN"]
+
+    if not valid:
+        if any(r["result"] == "INVALID_CREDS" for r in results):
+            return "Credentials rejected - cannot assess MFA (verify username/password)."
+        if any(r["result"] == "DISABLED" for r in results):
+            return "Account is disabled - cannot assess MFA."
+        return "No conclusive result (user/tenant not found or endpoint errors)."
+
+    if no_mfa and enforced:
+        eps = ", ".join(r["endpoint"] for r in no_mfa)
+        return f"INCONSISTENT: MFA enforced on some endpoints but NOT on: {eps} (possible bypass)."
+    if no_mfa:
+        eps = ", ".join(r["endpoint"] for r in no_mfa)
+        return f"NO MFA on tested endpoint(s): {eps} - password-only sign-in succeeded."
+    return "MFA enforced on all tested endpoints (password alone was insufficient)."
+
+def mfa_test(session: requests.Session, username: str, password: str, timeout: float) -> Dict:
+    """Probe MFA enforcement for one account across several ROPC clients.
+
+    Tests a SINGLE account (this is not a password sprayer) and halts on smart
+    lockout. Only run against tenants/accounts you are authorized to test.
+
+    Args:
+        session (requests.Session): Shared HTTP session.
+        username (str): UPN to authenticate as.
+        password (str): Password for the account.
+        timeout (float): Request timeout in seconds.
+
+    Returns:
+        Dict: {username, endpoints: [...], summary}.
+    """
+    results: List[Dict] = []
+    halted = False
+
+    for label, client_id, resource in ROPC_CLIENTS:
+        if halted:
+            results.append({
+                "endpoint": label, "client_id": client_id,
+                "result": "SKIPPED", "aadsts": None,
+                "detail": "skipped after lockout",
+            })
+            continue
+
+        data = {
+            "grant_type": "password",
+            "resource": resource,
+            "client_id": client_id,
+            "username": username,
+            "password": password,
+            "scope": "openid",
+        }
+        logging.info(f"MFA test: {label} ...")
+        try:
+            resp = session.post(TOKEN_URL, data=data, timeout=timeout)
+        except requests.RequestException as exc:
+            results.append({
+                "endpoint": label, "client_id": client_id,
+                "result": "ERROR", "aadsts": None, "detail": str(exc),
+            })
+            continue
+
+        try:
+            body = resp.json()
+        except ValueError:
+            body = {}
+
+        outcome = classify_ropc_result(resp.status_code, body)
+        outcome["endpoint"] = label
+        outcome["client_id"] = client_id
+        results.append(outcome)
+
+        if outcome["result"] == "LOCKED":
+            logging.error("Smart lockout detected; halting further MFA attempts.")
+            halted = True
+
+    return {
+        "mode": "ropc",
+        "username": username,
+        "endpoints": results,
+        "summary": summarize_mfa(results),
+    }
+
+def get_credential_type(session: requests.Session, username: str, timeout: float) -> Dict:
+    """Query the unauthenticated GetCredentialType endpoint for an account.
+
+    Args:
+        session (requests.Session): Shared HTTP session.
+        username (str): UPN to look up.
+        timeout (float): Request timeout in seconds.
+
+    Returns:
+        Dict: Parsed response (possibly empty on error).
+    """
+    try:
+        resp = session.post(CREDTYPE_URL, json={"Username": username}, timeout=timeout)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.RequestException as exc:
+        logging.error(f"GetCredentialType failed for {username}: {exc}")
+    except ValueError as exc:
+        logging.error(f"GetCredentialType returned invalid JSON for {username}: {exc}")
+    return {}
+
+def credential_probe(session: requests.Session, username: str, timeout: float) -> Dict:
+    """Best-effort, no-password account/auth probe via GetCredentialType.
+
+    Reveals account existence, the federated IdP, Seamless SSO, and whether
+    password auth is offered - without submitting a password. MFA enforcement
+    is NOT determinable this way.
+
+    Args:
+        session (requests.Session): Shared HTTP session.
+        username (str): UPN to probe.
+        timeout (float): Request timeout in seconds.
+
+    Returns:
+        Dict: Probe result (mode "credential-probe").
+    """
+    data = get_credential_type(session, username, timeout)
+    creds = data.get("Credentials") or {}
+    ests = data.get("EstsProperties") or {}
+
+    domain = username.split("@")[-1] if "@" in username else ""
+    realm = get_userrealm(session, domain, timeout) if domain else {}
+    namespace = realm.get("NameSpaceType", "Unknown")
+    auth_url = creds.get("FederationRedirectUrl") or realm.get("AuthURL") or None
+
+    # IfExistsResult: 0/6 exist, 1 does not, 5 exists under a different IdP.
+    ife = data.get("IfExistsResult")
+    exists_map = {
+        0: "exists",
+        1: "does not exist",
+        5: "exists (different identity provider)",
+        6: "exists",
+    }
+    account_exists = exists_map.get(ife, f"unknown ({ife})")
+    throttled = bool(data.get("ThrottleStatus"))
+
+    result = {
+        "mode": "credential-probe",
+        "username": username,
+        "account_exists": account_exists,
+        "if_exists_result": ife,
+        "namespace_type": namespace,
+        "auth_provider": classify_auth_provider(namespace, auth_url),
+        "has_password": creds.get("HasPassword"),
+        "desktop_sso": ests.get("DesktopSsoEnabled"),
+        "throttled": throttled,
+        "note": "MFA enforcement cannot be determined without a valid password.",
+    }
+
+    if not data:
+        result["summary"] = "GetCredentialType returned nothing - inconclusive."
+    elif throttled:
+        result["summary"] = "Account existence is throttled/obfuscated by Microsoft - inconclusive."
+    else:
+        result["summary"] = (
+            f"Account {account_exists}; auth via {result['auth_provider']}. "
+            "Provide -p/--prompt-password to test MFA enforcement."
+        )
+    return result
 
 # -----------------------------
 # Output Handlers
@@ -331,6 +709,7 @@ def output_text(primary: Dict, records: List[Dict], out_stream) -> None:
     print(f"Tenant name    : {primary['tenant_name'] or '<unknown>'}", file=out_stream)
     print(f"Tenant GUID    : {primary['tenant_id'] or '<unknown>'}", file=out_stream)
     print(f"Company / brand: {primary['company'] or '<unknown>'}", file=out_stream)
+    print(f"Auth provider  : {primary.get('auth_provider') or '<unknown>'}", file=out_stream)
     print(f"Tenant domains : {len(primary['tenant_domains'])} discovered", file=out_stream)
     print("=" * 70, file=out_stream)
     print(file=out_stream)
@@ -338,19 +717,66 @@ def output_text(primary: Dict, records: List[Dict], out_stream) -> None:
         print(f"[{rec['domain']}]", file=out_stream)
         print(f"    company        : {rec['company'] or '<unknown>'}", file=out_stream)
         print(f"    namespace_type : {rec['namespace_type']}", file=out_stream)
+        print(f"    auth_provider  : {rec.get('auth_provider') or '<unknown>'}", file=out_stream)
         print(f"    tenant_id      : {rec['tenant_id'] or '<none>'}", file=out_stream)
         print(f"    tenant_name    : {rec['tenant_name'] or '<none>'}", file=out_stream)
         print(f"    cloud_instance : {rec['cloud_instance'] or '<none>'}", file=out_stream)
 
-def output_json(primary: Dict, records: List[Dict], out_stream) -> None:
+def output_mfa_text(mfa: Dict, out_stream) -> None:
+    """Display MFA / auth-assessment results in readable text.
+
+    Handles all three best-effort modes: full ROPC sign-in test, no-password
+    credential probe, and domain-only posture.
+
+    Args:
+        mfa (Dict): Result from run()'s MFA assessment.
+        out_stream: File-like object to write to.
+    """
+    mode = mfa.get("mode")
+    print(file=out_stream)
+    print("=" * 70, file=out_stream)
+
+    if mode == "domain-only":
+        print("MFA / auth test: domain-level only", file=out_stream)
+        print("=" * 70, file=out_stream)
+        print(mfa.get("note", ""), file=out_stream)
+        return
+
+    if mode == "credential-probe":
+        print(f"Account probe  : {mfa['username']} (no password)", file=out_stream)
+        print("=" * 70, file=out_stream)
+        print(f"    account_exists : {mfa['account_exists']}", file=out_stream)
+        print(f"    auth_provider  : {mfa['auth_provider']}", file=out_stream)
+        print(f"    namespace_type : {mfa['namespace_type']}", file=out_stream)
+        print(f"    has_password   : {mfa['has_password']}", file=out_stream)
+        print(f"    desktop_sso    : {mfa['desktop_sso']}", file=out_stream)
+        print(f"    throttled      : {mfa['throttled']}", file=out_stream)
+        print(f"\nAssessment: {mfa['summary']}", file=out_stream)
+        print(f"Note: {mfa['note']}", file=out_stream)
+        return
+
+    # mode == "ropc"
+    print(f"MFA test       : {mfa['username']}", file=out_stream)
+    print("=" * 70, file=out_stream)
+    for ep in mfa["endpoints"]:
+        print(f"[{ep['endpoint']}]", file=out_stream)
+        print(f"    result : {ep['result']}", file=out_stream)
+        print(f"    aadsts : {ep.get('aadsts') or '<none>'}", file=out_stream)
+        print(f"    detail : {ep.get('detail') or ''}", file=out_stream)
+    print(f"\nAssessment: {mfa['summary']}", file=out_stream)
+
+def output_json(primary: Dict, records: List[Dict], out_stream, mfa: Optional[Dict] = None) -> None:
     """Write results as JSON.
 
     Args:
         primary (Dict): Primary tenant summary.
         records (List[Dict]): Per-domain company records.
         out_stream: File-like object to write to.
+        mfa (Optional[Dict]): MFA-test result to include, if any.
     """
     payload = {"tenant": primary, "domains": records}
+    if mfa is not None:
+        payload["mfa_test"] = mfa
     json.dump(payload, out_stream, indent=2)
     out_stream.write("\n")
 
@@ -361,7 +787,10 @@ def output_csv(records: List[Dict], out_stream) -> None:
         records (List[Dict]): Per-domain company records.
         out_stream: File-like object to write to.
     """
-    fields = ["domain", "company", "namespace_type", "tenant_id", "tenant_name", "cloud_instance"]
+    fields = [
+        "domain", "company", "namespace_type", "auth_provider",
+        "tenant_id", "tenant_name", "cloud_instance", "auth_url",
+    ]
     writer = csv.DictWriter(out_stream, fieldnames=fields)
     writer.writeheader()
     for rec in records:
@@ -370,14 +799,15 @@ def output_csv(records: List[Dict], out_stream) -> None:
 # -----------------------------
 # Core Orchestration
 # -----------------------------
-def run(args: argparse.Namespace) -> Tuple[Dict, List[Dict]]:
+def run(args: argparse.Namespace) -> Tuple[Dict, List[Dict], Optional[Dict]]:
     """Execute the full enumeration workflow.
 
     Args:
         args (argparse.Namespace): Parsed command-line arguments.
 
     Returns:
-        Tuple[Dict, List[Dict]]: (primary_summary, per_domain_records).
+        Tuple[Dict, List[Dict], Optional[Dict]]:
+            (primary_summary, per_domain_records, mfa_result_or_None).
     """
     session = requests.Session()
     tenant_name_cache: Dict[str, Optional[str]] = {}
@@ -394,21 +824,27 @@ def run(args: argparse.Namespace) -> Tuple[Dict, List[Dict]]:
     if primary_tenant_id is not None:
         tenant_name_cache[primary_tenant_id] = tenant_name
 
+    primary_namespace = primary_realm.get("NameSpaceType", "Unknown")
+    primary_auth_url = primary_realm.get("AuthURL") or None
     primary_company = primary_realm.get("FederationBrandName") or tenant_name
+    primary_provider = classify_auth_provider(primary_namespace, primary_auth_url)
     primary_record = {
         "domain": primary,
         "company": primary_company,
-        "namespace_type": primary_realm.get("NameSpaceType", "Unknown"),
+        "namespace_type": primary_namespace,
         "tenant_id": primary_tenant_id,
         "tenant_name": tenant_name,
         "cloud_instance": primary_realm.get("CloudInstanceName") or None,
+        "auth_provider": primary_provider,
+        "auth_url": primary_auth_url,
     }
     primary_summary = {
         "domain": primary,
         "tenant_name": tenant_name,
         "tenant_id": primary_tenant_id,
         "company": primary_company,
-        "namespace_type": primary_record["namespace_type"],
+        "namespace_type": primary_namespace,
+        "auth_provider": primary_provider,
         "tenant_domains": tenant_domains,
     }
 
@@ -424,32 +860,67 @@ def run(args: argparse.Namespace) -> Tuple[Dict, List[Dict]]:
         logging.info(f"Identifying company for {domain} ...")
         records.append(identify_company(session, domain, args.timeout, tenant_name_cache))
 
-    return primary_summary, records
+    mfa_result: Optional[Dict] = None
+    if args.mfa_test:
+        if args.username and args.password:
+            logging.warning(
+                "ACTIVE MFA TEST: authenticating as %s against live Microsoft "
+                "endpoints. Authorized use only; attempts may trigger alerts or "
+                "smart lockout.", args.username,
+            )
+            mfa_result = mfa_test(session, args.username, args.password, args.timeout)
+        elif args.username:
+            logging.info(
+                "No password provided; running no-password account probe "
+                "(GetCredentialType) for %s.", args.username,
+            )
+            mfa_result = credential_probe(session, args.username, args.timeout)
+        else:
+            mfa_result = {
+                "mode": "domain-only",
+                "note": "Per-account MFA/auth checks require -u USERNAME (and "
+                        "-p/--prompt-password for the sign-in test). See "
+                        "auth_provider in the tenant summary above.",
+            }
+
+    return primary_summary, records, mfa_result
 
 # -----------------------------
 # Main Entry Point
 # -----------------------------
+def emit(fmt: str, primary: Dict, records: List[Dict],
+         mfa: Optional[Dict], out_stream) -> None:
+    """Write results in the requested format to a stream.
+
+    Args:
+        fmt (str): One of "text", "json", "csv".
+        primary (Dict): Primary tenant summary.
+        records (List[Dict]): Per-domain company records.
+        mfa (Optional[Dict]): MFA-test result, if any.
+        out_stream: File-like object to write to.
+    """
+    if fmt == "json":
+        output_json(primary, records, out_stream, mfa)
+    elif fmt == "csv":
+        output_csv(records, out_stream)
+        if mfa is not None:
+            logging.warning("MFA results are not included in CSV output; use -F json or text.")
+    else:
+        output_text(primary, records, out_stream)
+        if mfa is not None:
+            output_mfa_text(mfa, out_stream)
+
 def main() -> None:
     """Main execution flow."""
     try:
         args = parse_args()
-        primary_summary, records = run(args)
+        primary_summary, records, mfa_result = run(args)
 
         if args.output:
             with open(args.output, "w", encoding="utf-8", newline="") as handle:
-                if args.fmt == "json":
-                    output_json(primary_summary, records, handle)
-                elif args.fmt == "csv":
-                    output_csv(records, handle)
-                else:
-                    output_text(primary_summary, records, handle)
+                emit(args.fmt, primary_summary, records, mfa_result, handle)
         else:
-            if args.fmt == "json":
-                output_json(primary_summary, records, sys.stdout)
-            elif args.fmt == "csv":
-                output_csv(records, sys.stdout)
-            else:
-                output_text(primary_summary, records, sys.stdout)
+            emit(args.fmt, primary_summary, records, mfa_result, sys.stdout)
 
     except KeyboardInterrupt:
         logging.error("Interrupted by user")

@@ -16,6 +16,19 @@ and this project adheres to the project-wide date-based versioning scheme
   identifies any domains supplied via `-f/--file`. Outputs text, JSON, or
   CSV (`-F`), to stdout or a file (`-o`). Marked executable to match the
   other CLI tools in `python/`.
+  - Reports the identity provider fronting each tenant (`auth_provider`:
+    Okta, Microsoft ADFS, Ping, OneLogin, Shibboleth, Duo, Google, Auth0,
+    CAS, or Entra-managed), derived unauthenticated from the federation
+    AuthURL.
+  - Optional `--mfa-test` for MFA / authentication posture, best-effort by
+    input (useful when an engagement has a target user but no password):
+    `-u USER -p PASS` (or `--prompt-password`) runs a real ROPC sign-in test
+    across several first-party clients and maps the `AADSTS` result to MFA
+    enforcement / bypass (MFASweep technique); `-u USER` alone runs an
+    unauthenticated `GetCredentialType` probe (account existence, IdP,
+    Seamless SSO, has-password); neither reports domain-level posture only.
+    Single-account (not a sprayer), halts on smart-lockout, and prints an
+    authorization warning before any sign-in attempt.
   - Documents a known limitation: Microsoft has curtailed the Autodiscover
     `GetFederationInformation` endpoint, which now typically returns only the
     queried domain rather than the tenant's full domain list, so the derived
