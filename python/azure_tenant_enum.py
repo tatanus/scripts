@@ -82,6 +82,7 @@ import csv
 import getpass
 import json
 import logging
+import os
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -128,6 +129,13 @@ DKIM_SELECTORS = ("selector1", "selector2")
 # here are only a *candidate* pool - each is confirmed to belong to the tenant
 # by matching its openid-configuration tenant GUID before being reported.
 CRT_URL_TMPL = "https://crt.sh/?q=%25{label}%25&output=json"
+# certSpotter is a more reliable CT source used as a fallback / supplement to
+# crt.sh (which is frequently 5xx/404). Free tier is rate-limited; set
+# CERTSPOTTER_API_KEY in the environment to raise the limit.
+CERTSPOTTER_URL_TMPL = (
+    "https://api.certspotter.com/v1/issuances"
+    "?domain={domain}&include_subdomains=true&expand=dns_names"
+)
 CRT_DEFAULT_LIMIT = 200
 MEMBERSHIP_WORKERS = 10
 
@@ -588,45 +596,71 @@ def gather_tenant_domains(
         domains.update(get_acs_domains(session, tenant_id, timeout))
     return sorted(domains)
 
-def get_ct_domains(session: requests.Session, domain: str, timeout: float, limit: int) -> List[str]:
-    """Seed candidate apex domains from Certificate Transparency (crt.sh).
+def _ct_crtsh(session: requests.Session, domain: str, timeout: float) -> set:
+    """Return raw certificate DNS names from crt.sh (may be empty on error)."""
+    url = CRT_URL_TMPL.format(label=domain.split(".")[0])
+    try:
+        resp = session.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=max(timeout, 30))
+        if resp.status_code != 200:
+            logging.warning(f"crt.sh returned HTTP {resp.status_code}; using other CT sources")
+            return set()
+        rows = resp.json()
+    except (requests.RequestException, ValueError) as exc:
+        logging.warning(f"crt.sh query failed ({exc}); using other CT sources")
+        return set()
+    names = set()
+    for row in rows:
+        for name in (row.get("name_value", "") or "").split("\n"):
+            names.add(name.strip().lower().lstrip("*."))
+    return names
 
-    These are only CANDIDATES; the caller must verify tenant membership before
-    trusting them. Matches certificate identities containing the domain's first
-    label, reduced to apex (registrable-ish) domains.
+def _ct_certspotter(session: requests.Session, domain: str, timeout: float) -> set:
+    """Return raw certificate DNS names from certSpotter (may be empty on error)."""
+    url = CERTSPOTTER_URL_TMPL.format(domain=domain)
+    headers = {"User-Agent": "Mozilla/5.0"}
+    api_key = os.environ.get("CERTSPOTTER_API_KEY")
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    try:
+        resp = session.get(url, headers=headers, timeout=max(timeout, 30))
+        if resp.status_code != 200:
+            logging.warning(f"certSpotter returned HTTP {resp.status_code}; skipping")
+            return set()
+        rows = resp.json()
+    except (requests.RequestException, ValueError) as exc:
+        logging.warning(f"certSpotter query failed ({exc}); skipping")
+        return set()
+    names = set()
+    for row in rows:
+        for name in row.get("dns_names", []) or []:
+            names.add(name.strip().lower().lstrip("*."))
+    return names
+
+def get_ct_domains(session: requests.Session, domain: str, timeout: float, limit: int) -> List[str]:
+    """Seed candidate apex domains from Certificate Transparency logs.
+
+    Unions crt.sh (name-wildcard, finds differently-named apexes) with certSpotter
+    (reliable fallback). These are only CANDIDATES; the caller must verify tenant
+    membership by GUID before trusting them. crt.sh is frequently down, so a run
+    with only certSpotter results is normal.
 
     Args:
         session (requests.Session): Shared HTTP session.
-        domain (str): Domain whose label seeds the CT search.
+        domain (str): Domain seeding the CT search.
         timeout (float): Request timeout in seconds.
         limit (int): Maximum candidate apex domains to return.
 
     Returns:
         List[str]: Sorted candidate apex domains (may be empty).
     """
-    label = domain.split(".")[0]
-    url = CRT_URL_TMPL.format(label=label)
-    try:
-        resp = session.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=max(timeout, 30))
-        if resp.status_code != 200:
-            logging.warning(f"crt.sh returned HTTP {resp.status_code}; skipping CT seeding")
-            return []
-        rows = resp.json()
-    except requests.RequestException as exc:
-        logging.warning(f"crt.sh query failed: {exc}")
-        return []
-    except ValueError:
-        logging.warning("crt.sh returned non-JSON; skipping CT seeding")
-        return []
-
-    apexes = set()
-    for row in rows:
-        for name in (row.get("name_value", "") or "").split("\n"):
-            name = name.strip().lower().lstrip("*.")
-            if "." in name and DOMAIN_RE.match(name):
-                # Naive apex (last two labels); wrong guesses are dropped later
-                # by GUID verification, so ccTLD imprecision is harmless.
-                apexes.add(".".join(name.split(".")[-2:]))
+    names = _ct_crtsh(session, domain, timeout) | _ct_certspotter(session, domain, timeout)
+    apexes = {
+        # Naive apex (last two labels); wrong guesses are dropped later by GUID
+        # verification, so ccTLD imprecision is harmless.
+        ".".join(name.split(".")[-2:])
+        for name in names
+        if "." in name and DOMAIN_RE.match(name)
+    }
     return sorted(apexes)[:limit]
 
 def verify_tenant_membership(

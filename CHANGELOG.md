@@ -51,8 +51,10 @@ and this project adheres to the project-wide date-based versioning scheme
     confirmed to belong to the tenant by matching their openid-configuration
     tenant GUID (checked concurrently). Only verified domains are reported in a
     consolidated `verified_tenant_domains` list, and every per-domain record
-    gains a `same_tenant` flag; unverifiable candidates are dropped. CT failures
-    (e.g. crt.sh 5xx) degrade gracefully to the authoritative results.
+    gains a `same_tenant` flag; unverifiable candidates are dropped. CT uses
+    crt.sh with a **certSpotter fallback** (crt.sh is frequently 5xx/404;
+    `CERTSPOTTER_API_KEY` raises the certSpotter rate limit); an outage of one
+    source degrades gracefully to the others / authoritative results.
 
 ## [2026.08.26.0] - 2026-08-26
 
