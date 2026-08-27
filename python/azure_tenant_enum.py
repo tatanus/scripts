@@ -29,13 +29,16 @@
 #               password sprayer) and halts on smart-lockout, but attempts can
 #               still trigger sign-in alerts or lockout.
 #
-#               NOTE: The Autodiscover GetFederationInformation endpoint once
-#               returned the full set of domains registered to a tenant, but
-#               Microsoft has since curtailed it - it now typically returns only
-#               the queried domain. Consequently the tenant-domain list (and the
-#               *.onmicrosoft.com tenant name derived from it) is usually just
-#               the input domain; the tenant GUID, brand name, and namespace
-#               type remain reliable.
+#               TENANT NAME: The *.onmicrosoft.com name is resolved from several
+#               sources, in order: Autodiscover GetFederationInformation (now
+#               curtailed by Microsoft - usually only echoes the queried
+#               domain), the Azure ACS metadata endpoint (the TeamFiltration
+#               technique - authoritative but empty on newer tenants as ACS is
+#               retired), and finally a GUID-verified guess (candidate names
+#               derived from the domain/brand, accepted only if
+#               "<candidate>.onmicrosoft.com" resolves to the same tenant GUID -
+#               so a wrong name is never reported). When none succeed the name is
+#               left blank; the tenant GUID, brand, and namespace stay reliable.
 # AUTHOR      : Adam Compton
 # DATE CREATED: 2026-07-25 00:00:00
 # =============================================================================
@@ -52,6 +55,9 @@
 # 2026-08-26 00:00:00  | Claude       | --mfa-test made best-effort: works with
 #                      |              | username-only (GetCredentialType probe)
 #                      |              | or no credentials (domain posture).
+# 2026-08-27 00:00:00  | Claude       | Fixed tenant-name resolution: add ACS
+#                      |              | metadata lookup + GUID-verified guess
+#                      |              | fallback (GetFederationInformation dead).
 # =============================================================================
 
 import argparse
@@ -81,6 +87,11 @@ LOGIN_BASE = "https://login.microsoftonline.com"
 USERREALM_URL = f"{LOGIN_BASE}/getuserrealm.srf"
 OPENID_URL_TMPL = f"{LOGIN_BASE}/{{domain}}/.well-known/openid-configuration"
 AUTODISCOVER_URL = "https://autodiscover-s.outlook.com/autodiscover/autodiscover.svc"
+# Azure Access Control Service (ACS) metadata - accepts a domain OR a tenant
+# GUID and lists the tenant's registered domains in allowedAudiences (the
+# technique used by TeamFiltration). Being retired by Microsoft, so it is often
+# empty on newer tenants, but authoritative when populated.
+ACS_METADATA_URL_TMPL = "https://accounts.accesscontrol.windows.net/{identifier}/metadata/json/1"
 
 # GUID embedded in the openid-configuration issuer URI, e.g.
 # https://sts.windows.net/72f988bf-86f1-41af-91ab-2d7cd011db47/
@@ -384,6 +395,44 @@ def get_tenant_domains(session: requests.Session, domain: str, timeout: float) -
     }
     return sorted(domains)
 
+def get_acs_domains(session: requests.Session, identifier: str, timeout: float) -> List[str]:
+    """List a tenant's domains via the Azure ACS metadata endpoint.
+
+    The identifier may be a domain OR a tenant GUID. Domains are harvested from
+    every domain-like token in the allowedAudiences service-principal strings.
+    ACS is being retired, so this is often empty on newer tenants, but it is
+    authoritative (and includes the *.onmicrosoft.com name) when populated.
+
+    Args:
+        session (requests.Session): Shared HTTP session.
+        identifier (str): A domain or tenant GUID.
+        timeout (float): Request timeout in seconds.
+
+    Returns:
+        List[str]: Sorted, de-duplicated domains (may be empty).
+    """
+    url = ACS_METADATA_URL_TMPL.format(identifier=identifier)
+    try:
+        resp = session.get(url, timeout=timeout)
+        if resp.status_code != 200:
+            return []
+        data = resp.json()
+    except requests.RequestException as exc:
+        logging.error(f"ACS metadata failed for {identifier}: {exc}")
+        return []
+    except ValueError:
+        return []
+
+    domains = set()
+    for audience in data.get("allowedAudiences") or []:
+        # Audiences look like "<spn-guid>/<host>@<realm>"; pull every token
+        # that parses as a domain (the onmicrosoft name can appear either side).
+        for token in re.split(r"[@/]", audience):
+            token = token.strip().lower()
+            if "." in token and DOMAIN_RE.match(token):
+                domains.add(token)
+    return sorted(domains)
+
 # -----------------------------
 # Derivation Helpers
 # -----------------------------
@@ -400,6 +449,120 @@ def find_tenant_name(domains: List[str]) -> Optional[str]:
         if entry.endswith(".onmicrosoft.com") and not entry.endswith(".mail.onmicrosoft.com"):
             return entry.rsplit(".onmicrosoft.com", 1)[0]
     return None
+
+def _tenant_name_candidates(domain: str, brand: Optional[str]) -> List[str]:
+    """Derive plausible *.onmicrosoft.com prefixes from a domain and brand.
+
+    Args:
+        domain (str): The custom domain (e.g. "contoso.com").
+        brand (Optional[str]): FederationBrandName, if known.
+
+    Returns:
+        List[str]: Ordered, de-duplicated candidate prefixes.
+    """
+    candidates: List[str] = []
+    labels = domain.split(".")
+    if labels:
+        candidates.append(labels[0])           # contoso.com     -> contoso
+    if len(labels) > 1:
+        candidates.append("".join(labels[:-1]))  # sub.contoso.com -> subcontoso
+    if brand:
+        flat = re.sub(r"[^a-z0-9]", "", brand.lower())
+        candidates.append(flat)                # "Contoso Ltd"   -> contosoltd
+        words = brand.lower().split()
+        if words:
+            candidates.append(re.sub(r"[^a-z0-9]", "", words[0]))  # -> contoso
+
+    seen: set = set()
+    ordered: List[str] = []
+    for cand in candidates:
+        if cand and cand not in seen:
+            seen.add(cand)
+            ordered.append(cand)
+    return ordered
+
+def resolve_tenant_name(
+    session: requests.Session,
+    domain: str,
+    brand: Optional[str],
+    tenant_id: Optional[str],
+    timeout: float,
+) -> Optional[str]:
+    """Recover the *.onmicrosoft.com tenant name by verified candidate matching.
+
+    GetFederationInformation no longer lists a tenant's domains, so the
+    onmicrosoft name is derived from the domain/brand and CONFIRMED by checking
+    that "<candidate>.onmicrosoft.com" resolves to the same tenant GUID. Only a
+    GUID-verified candidate is returned, so a wrong name is never reported.
+
+    Args:
+        session (requests.Session): Shared HTTP session.
+        domain (str): The domain being resolved.
+        brand (Optional[str]): FederationBrandName, if known.
+        tenant_id (Optional[str]): The tenant GUID to match against.
+        timeout (float): Request timeout in seconds.
+
+    Returns:
+        Optional[str]: The verified tenant name, or None if undetermined.
+    """
+    if not tenant_id:
+        return None
+    for candidate in _tenant_name_candidates(domain, brand):
+        candidate_id = get_tenant_id(session, f"{candidate}.onmicrosoft.com", timeout)
+        if candidate_id and candidate_id.lower() == tenant_id.lower():
+            return candidate
+    return None
+
+def gather_tenant_domains(
+    session: requests.Session,
+    domain: str,
+    tenant_id: Optional[str],
+    timeout: float,
+) -> List[str]:
+    """Union of a tenant's domains from all available sources.
+
+    Combines GetFederationInformation (mostly the queried domain now) with the
+    ACS metadata endpoint queried by domain and, when known, by tenant GUID.
+
+    Args:
+        session (requests.Session): Shared HTTP session.
+        domain (str): Domain to enumerate.
+        tenant_id (Optional[str]): Tenant GUID, if known.
+        timeout (float): Request timeout in seconds.
+
+    Returns:
+        List[str]: Sorted, de-duplicated tenant domains.
+    """
+    domains = set(get_tenant_domains(session, domain, timeout))
+    domains.update(get_acs_domains(session, domain, timeout))
+    if tenant_id:
+        domains.update(get_acs_domains(session, tenant_id, timeout))
+    return sorted(domains)
+
+def determine_tenant_name(
+    session: requests.Session,
+    domain: str,
+    brand: Optional[str],
+    tenant_id: Optional[str],
+    tenant_domains: List[str],
+    timeout: float,
+) -> Optional[str]:
+    """Best-effort tenant name: from discovered domains, else GUID-verified guess.
+
+    Args:
+        session (requests.Session): Shared HTTP session.
+        domain (str): Domain being resolved.
+        brand (Optional[str]): FederationBrandName, if known.
+        tenant_id (Optional[str]): Tenant GUID, if known.
+        tenant_domains (List[str]): Domains already discovered for the tenant.
+        timeout (float): Request timeout in seconds.
+
+    Returns:
+        Optional[str]: The tenant name, or None if undetermined.
+    """
+    return find_tenant_name(tenant_domains) or resolve_tenant_name(
+        session, domain, brand, tenant_id, timeout
+    )
 
 def classify_auth_provider(namespace: str, auth_url: Optional[str]) -> str:
     """Classify the identity provider fronting a domain's authentication.
@@ -458,8 +621,11 @@ def identify_company(
         tenant_id = get_tenant_id(session, domain, timeout)
         if tenant_id is not None:
             if tenant_id not in tenant_name_cache:
-                tenant_domains = get_tenant_domains(session, domain, timeout)
-                tenant_name_cache[tenant_id] = find_tenant_name(tenant_domains)
+                tenant_domains = gather_tenant_domains(session, domain, tenant_id, timeout)
+                tenant_name_cache[tenant_id] = determine_tenant_name(
+                    session, domain, realm.get("FederationBrandName"),
+                    tenant_id, tenant_domains, timeout,
+                )
             tenant_name = tenant_name_cache[tenant_id]
 
     # Fall back to the onmicrosoft tenant name when no brand is published.
@@ -819,8 +985,11 @@ def run(args: argparse.Namespace) -> Tuple[Dict, List[Dict], Optional[Dict]]:
     # summary and its per-domain record, avoiding duplicate HTTP lookups.
     primary_realm = get_userrealm(session, primary, args.timeout)
     primary_tenant_id = get_tenant_id(session, primary, args.timeout)
-    tenant_domains = get_tenant_domains(session, primary, args.timeout)
-    tenant_name = find_tenant_name(tenant_domains)
+    tenant_domains = gather_tenant_domains(session, primary, primary_tenant_id, args.timeout)
+    tenant_name = determine_tenant_name(
+        session, primary, primary_realm.get("FederationBrandName"),
+        primary_tenant_id, tenant_domains, args.timeout,
+    )
     if primary_tenant_id is not None:
         tenant_name_cache[primary_tenant_id] = tenant_name
 

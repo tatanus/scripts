@@ -29,11 +29,16 @@ and this project adheres to the project-wide date-based versioning scheme
     Seamless SSO, has-password); neither reports domain-level posture only.
     Single-account (not a sprayer), halts on smart-lockout, and prints an
     authorization warning before any sign-in attempt.
-  - Documents a known limitation: Microsoft has curtailed the Autodiscover
-    `GetFederationInformation` endpoint, which now typically returns only the
-    queried domain rather than the tenant's full domain list, so the derived
-    `*.onmicrosoft.com` tenant name is usually unavailable. Tenant GUID,
-    brand, and namespace type remain reliable.
+  - Resolves the `*.onmicrosoft.com` tenant name from multiple sources, since
+    Microsoft has curtailed the Autodiscover `GetFederationInformation`
+    endpoint (it now only echoes the queried domain): the ACS metadata endpoint
+    (`accounts.accesscontrol.windows.net/{domain-or-tenantId}/metadata/json/1`,
+    the TeamFiltration technique; authoritative but empty on newer tenants as
+    ACS is retired), then a GUID-verified guess (candidates derived from the
+    domain and federation brand name, accepted only when
+    `<candidate>.onmicrosoft.com` resolves to the same tenant GUID — so a wrong
+    name is never reported). The name is left blank only when all sources fail;
+    tenant GUID, brand, and namespace type remain reliable regardless.
 
 ## [2026.08.26.0] - 2026-08-26
 
