@@ -30,15 +30,18 @@
 #               still trigger sign-in alerts or lockout.
 #
 #               TENANT NAME: The *.onmicrosoft.com name is resolved from several
-#               sources, in order: Autodiscover GetFederationInformation (now
-#               curtailed by Microsoft - usually only echoes the queried
-#               domain), the Azure ACS metadata endpoint (the TeamFiltration
-#               technique - authoritative but empty on newer tenants as ACS is
-#               retired), and finally a GUID-verified guess (candidate names
-#               derived from the domain/brand, accepted only if
-#               "<candidate>.onmicrosoft.com" resolves to the same tenant GUID -
-#               so a wrong name is never reported). When none succeed the name is
-#               left blank; the tenant GUID, brand, and namespace stay reliable.
+#               sources, most authoritative first: Autodiscover
+#               GetFederationInformation (now curtailed by Microsoft - usually
+#               only echoes the queried domain); the Azure ACS metadata endpoint
+#               (the TeamFiltration technique - authoritative but empty on newer
+#               tenants as ACS is retired); the Office 365 DKIM selector CNAMEs
+#               (selector1/2._domainkey.<domain>, whose target embeds the tenant
+#               name - reliable org-published DNS, requires dnspython); and
+#               finally a GUID-verified guess (domain/brand-derived candidates
+#               accepted only when "<candidate>.onmicrosoft.com" resolves to the
+#               same tenant GUID). A wrong name is never reported; when every
+#               source fails the name is left blank. Tenant GUID, brand, and
+#               namespace type stay reliable regardless.
 # AUTHOR      : Adam Compton
 # DATE CREATED: 2026-07-25 00:00:00
 # =============================================================================
@@ -58,6 +61,9 @@
 # 2026-08-27 00:00:00  | Claude       | Fixed tenant-name resolution: add ACS
 #                      |              | metadata lookup + GUID-verified guess
 #                      |              | fallback (GetFederationInformation dead).
+# 2026-08-27 00:00:00  | Claude       | Add DKIM selector CNAME tenant-name
+#                      |              | source (recovers non-obvious names ACS/
+#                      |              | guessing miss, e.g. paulweiss -> pwrwg).
 # =============================================================================
 
 import argparse
@@ -71,6 +77,13 @@ import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Tuple
 
 import requests
+
+try:
+    import dns.exception
+    import dns.resolver
+    _HAVE_DNSPYTHON = True
+except ImportError:
+    _HAVE_DNSPYTHON = False
 
 # -----------------------------
 # Logging Configuration
@@ -92,6 +105,12 @@ AUTODISCOVER_URL = "https://autodiscover-s.outlook.com/autodiscover/autodiscover
 # technique used by TeamFiltration). Being retired by Microsoft, so it is often
 # empty on newer tenants, but authoritative when populated.
 ACS_METADATA_URL_TMPL = "https://accounts.accesscontrol.windows.net/{identifier}/metadata/json/1"
+
+# Office 365 publishes DKIM selector CNAMEs of the form
+#   selector1._domainkey.<domain> -> selector1-<domain>._domainkey.<tenant>.onmicrosoft.com
+# so the tenant name is embedded in the CNAME target - a reliable DNS-based
+# source that works even when ACS / GetFederationInformation do not.
+DKIM_SELECTORS = ("selector1", "selector2")
 
 # GUID embedded in the openid-configuration issuer URI, e.g.
 # https://sts.windows.net/72f988bf-86f1-41af-91ab-2d7cd011db47/
@@ -539,6 +558,44 @@ def gather_tenant_domains(
         domains.update(get_acs_domains(session, tenant_id, timeout))
     return sorted(domains)
 
+def get_tenant_name_via_dkim(domain: str, timeout: float) -> Optional[str]:
+    """Recover the tenant name from Office 365 DKIM selector CNAMEs.
+
+    O365 publishes selector1/selector2._domainkey.<domain> as CNAMEs of the form
+    selector1-<domain>._domainkey.<tenant>.onmicrosoft.com, embedding the tenant
+    name in the target. Authoritative (the org's own DNS) and works when ACS /
+    GetFederationInformation do not. Requires dnspython.
+
+    Args:
+        domain (str): Domain to query.
+        timeout (float): DNS timeout in seconds.
+
+    Returns:
+        Optional[str]: The tenant name, or None if not found / dnspython absent.
+    """
+    if not _HAVE_DNSPYTHON:
+        logging.debug("dnspython not installed; skipping DKIM tenant-name lookup")
+        return None
+
+    resolver = dns.resolver.Resolver()
+    resolver.timeout = timeout
+    resolver.lifetime = timeout
+
+    for selector in DKIM_SELECTORS:
+        try:
+            answer = resolver.resolve(f"{selector}._domainkey.{domain}", "CNAME")
+        except dns.exception.DNSException:
+            continue
+        for record in answer:
+            target = str(record.target).rstrip(".").lower()
+            if target.endswith(".onmicrosoft.com") and not target.endswith(".mail.onmicrosoft.com"):
+                # ..._domainkey.<tenant>.onmicrosoft.com -> <tenant>
+                prefix = target[: -len(".onmicrosoft.com")]
+                name = prefix.split(".")[-1]
+                if name:
+                    return name
+    return None
+
 def determine_tenant_name(
     session: requests.Session,
     domain: str,
@@ -547,7 +604,10 @@ def determine_tenant_name(
     tenant_domains: List[str],
     timeout: float,
 ) -> Optional[str]:
-    """Best-effort tenant name: from discovered domains, else GUID-verified guess.
+    """Best-effort tenant name from all sources, most authoritative first.
+
+    Order: discovered domains (GFI/ACS) -> DKIM selector CNAMEs (org DNS) ->
+    GUID-verified guess. Returns None only when every source fails.
 
     Args:
         session (requests.Session): Shared HTTP session.
@@ -560,8 +620,10 @@ def determine_tenant_name(
     Returns:
         Optional[str]: The tenant name, or None if undetermined.
     """
-    return find_tenant_name(tenant_domains) or resolve_tenant_name(
-        session, domain, brand, tenant_id, timeout
+    return (
+        find_tenant_name(tenant_domains)
+        or get_tenant_name_via_dkim(domain, timeout)
+        or resolve_tenant_name(session, domain, brand, tenant_id, timeout)
     )
 
 def classify_auth_provider(namespace: str, auth_url: Optional[str]) -> str:

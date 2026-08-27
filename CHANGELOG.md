@@ -29,16 +29,21 @@ and this project adheres to the project-wide date-based versioning scheme
     Seamless SSO, has-password); neither reports domain-level posture only.
     Single-account (not a sprayer), halts on smart-lockout, and prints an
     authorization warning before any sign-in attempt.
-  - Resolves the `*.onmicrosoft.com` tenant name from multiple sources, since
-    Microsoft has curtailed the Autodiscover `GetFederationInformation`
-    endpoint (it now only echoes the queried domain): the ACS metadata endpoint
+  - Resolves the `*.onmicrosoft.com` tenant name from multiple sources (most
+    authoritative first), since Microsoft has curtailed the Autodiscover
+    `GetFederationInformation` endpoint (it now only echoes the queried domain):
+    the ACS metadata endpoint
     (`accounts.accesscontrol.windows.net/{domain-or-tenantId}/metadata/json/1`,
     the TeamFiltration technique; authoritative but empty on newer tenants as
-    ACS is retired), then a GUID-verified guess (candidates derived from the
-    domain and federation brand name, accepted only when
-    `<candidate>.onmicrosoft.com` resolves to the same tenant GUID — so a wrong
-    name is never reported). The name is left blank only when all sources fail;
-    tenant GUID, brand, and namespace type remain reliable regardless.
+    ACS is retired); the Office 365 **DKIM selector CNAMEs**
+    (`selector1/2._domainkey.<domain>`, whose target embeds the tenant name —
+    reliable org-published DNS, recovers non-obvious names such as
+    `paulweiss.com` → `pwrwg`, `tesla.com` → `teslamotorsinc`; requires
+    dnspython, imported softly); and a GUID-verified guess (domain/brand-derived
+    candidates accepted only when `<candidate>.onmicrosoft.com` resolves to the
+    same tenant GUID). A wrong name is never reported; the name is blank only
+    when every source fails (e.g. a domain whose mail isn't Exchange Online).
+    Tenant GUID, brand, and namespace type remain reliable regardless.
 
 ## [2026.08.26.0] - 2026-08-26
 
