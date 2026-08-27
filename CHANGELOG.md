@@ -44,6 +44,15 @@ and this project adheres to the project-wide date-based versioning scheme
     same tenant GUID). A wrong name is never reported; the name is blank only
     when every source fails (e.g. a domain whose mail isn't Exchange Online).
     Tenant GUID, brand, and namespace type remain reliable regardless.
+  - Enumerates additional tenant domains with **high certainty only**. Since a
+    full unauthenticated domain dump is no longer possible (GetFederationInfo
+    curtailed, ACS retired), candidate domains — from ACS metadata, `-f/--file`,
+    and optionally Certificate Transparency (`--crt`, `--crt-limit`) — are each
+    confirmed to belong to the tenant by matching their openid-configuration
+    tenant GUID (checked concurrently). Only verified domains are reported in a
+    consolidated `verified_tenant_domains` list, and every per-domain record
+    gains a `same_tenant` flag; unverifiable candidates are dropped. CT failures
+    (e.g. crt.sh 5xx) degrade gracefully to the authoritative results.
 
 ## [2026.08.26.0] - 2026-08-26
 

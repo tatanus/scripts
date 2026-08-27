@@ -12,6 +12,14 @@
 #               Shibboleth, Duo, Google, or Entra-managed), derived from the
 #               federation AuthURL - this is unauthenticated.
 #
+#               DOMAIN ENUMERATION: full unauthenticated dumping of a tenant's
+#               domains is no longer possible (GetFederationInformation curtailed,
+#               ACS retired). Instead, candidate domains (ACS metadata, -f/--file,
+#               and optionally Certificate Transparency via --crt) are each
+#               CONFIRMED to belong to the tenant by matching their tenant GUID,
+#               and only verified, high-certainty domains are reported
+#               (verified_tenant_domains).
+#
 #               OPTIONAL --mfa-test: assess MFA / authentication posture on a
 #               best-effort basis, degrading with the inputs supplied:
 #                 * -u USER -p PASS : full ROPC sign-in test across several
@@ -64,6 +72,9 @@
 # 2026-08-27 00:00:00  | Claude       | Add DKIM selector CNAME tenant-name
 #                      |              | source (recovers non-obvious names ACS/
 #                      |              | guessing miss, e.g. paulweiss -> pwrwg).
+# 2026-08-27 00:00:00  | Claude       | Add high-certainty tenant-domain
+#                      |              | enumeration: ACS + optional crt.sh (--crt)
+#                      |              | candidates, all confirmed by GUID match.
 # =============================================================================
 
 import argparse
@@ -74,6 +85,7 @@ import logging
 import re
 import sys
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Tuple
 
 import requests
@@ -111,6 +123,13 @@ ACS_METADATA_URL_TMPL = "https://accounts.accesscontrol.windows.net/{identifier}
 # so the tenant name is embedded in the CNAME target - a reliable DNS-based
 # source that works even when ACS / GetFederationInformation do not.
 DKIM_SELECTORS = ("selector1", "selector2")
+
+# Certificate Transparency (crt.sh) as a candidate-domain source. Names found
+# here are only a *candidate* pool - each is confirmed to belong to the tenant
+# by matching its openid-configuration tenant GUID before being reported.
+CRT_URL_TMPL = "https://crt.sh/?q=%25{label}%25&output=json"
+CRT_DEFAULT_LIMIT = 200
+MEMBERSHIP_WORKERS = 10
 
 # GUID embedded in the openid-configuration issuer URI, e.g.
 # https://sts.windows.net/72f988bf-86f1-41af-91ab-2d7cd011db47/
@@ -245,6 +264,17 @@ def parse_args() -> argparse.Namespace:
         "-t", "--timeout", dest="timeout", type=float, default=15.0,
         help="Per-request HTTP timeout in seconds (default: 15)"
     )
+    enum = parser.add_argument_group("Tenant domain enumeration")
+    enum.add_argument(
+        "--crt", dest="crt", action="store_true",
+        help="Seed candidate domains from Certificate Transparency (crt.sh); "
+             "each candidate is GUID-verified before being reported"
+    )
+    enum.add_argument(
+        "--crt-limit", dest="crt_limit", type=int, default=CRT_DEFAULT_LIMIT,
+        help=f"Max CT candidate apex domains to verify (default: {CRT_DEFAULT_LIMIT})"
+    )
+
     mfa = parser.add_argument_group("MFA / auth test (best-effort; authorized use only)")
     mfa.add_argument(
         "--mfa-test", dest="mfa_test", action="store_true",
@@ -557,6 +587,83 @@ def gather_tenant_domains(
     if tenant_id:
         domains.update(get_acs_domains(session, tenant_id, timeout))
     return sorted(domains)
+
+def get_ct_domains(session: requests.Session, domain: str, timeout: float, limit: int) -> List[str]:
+    """Seed candidate apex domains from Certificate Transparency (crt.sh).
+
+    These are only CANDIDATES; the caller must verify tenant membership before
+    trusting them. Matches certificate identities containing the domain's first
+    label, reduced to apex (registrable-ish) domains.
+
+    Args:
+        session (requests.Session): Shared HTTP session.
+        domain (str): Domain whose label seeds the CT search.
+        timeout (float): Request timeout in seconds.
+        limit (int): Maximum candidate apex domains to return.
+
+    Returns:
+        List[str]: Sorted candidate apex domains (may be empty).
+    """
+    label = domain.split(".")[0]
+    url = CRT_URL_TMPL.format(label=label)
+    try:
+        resp = session.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=max(timeout, 30))
+        if resp.status_code != 200:
+            logging.warning(f"crt.sh returned HTTP {resp.status_code}; skipping CT seeding")
+            return []
+        rows = resp.json()
+    except requests.RequestException as exc:
+        logging.warning(f"crt.sh query failed: {exc}")
+        return []
+    except ValueError:
+        logging.warning("crt.sh returned non-JSON; skipping CT seeding")
+        return []
+
+    apexes = set()
+    for row in rows:
+        for name in (row.get("name_value", "") or "").split("\n"):
+            name = name.strip().lower().lstrip("*.")
+            if "." in name and DOMAIN_RE.match(name):
+                # Naive apex (last two labels); wrong guesses are dropped later
+                # by GUID verification, so ccTLD imprecision is harmless.
+                apexes.add(".".join(name.split(".")[-2:]))
+    return sorted(apexes)[:limit]
+
+def verify_tenant_membership(
+    candidates: List[str],
+    tenant_id: str,
+    timeout: float,
+) -> List[str]:
+    """Return the candidate domains that belong to the given tenant.
+
+    A domain is confirmed in-tenant when its openid-configuration issuer carries
+    the same tenant GUID - a high-certainty, cryptographic-style match. Checks
+    run concurrently. Each worker uses its own session for thread-safety.
+
+    Args:
+        candidates (List[str]): Candidate domains to check.
+        tenant_id (str): The tenant GUID to match against.
+        timeout (float): Per-request timeout in seconds.
+
+    Returns:
+        List[str]: Sorted, confirmed in-tenant domains.
+    """
+    if not tenant_id or not candidates:
+        return []
+
+    target = tenant_id.lower()
+
+    def check(candidate: str) -> Optional[str]:
+        local = requests.Session()
+        found = get_tenant_id(local, candidate, timeout)
+        return candidate if found and found.lower() == target else None
+
+    verified = []
+    with ThreadPoolExecutor(max_workers=MEMBERSHIP_WORKERS) as pool:
+        for result in pool.map(check, candidates):
+            if result:
+                verified.append(result)
+    return sorted(verified)
 
 def get_tenant_name_via_dkim(domain: str, timeout: float) -> Optional[str]:
     """Recover the tenant name from Office 365 DKIM selector CNAMEs.
@@ -938,14 +1045,21 @@ def output_text(primary: Dict, records: List[Dict], out_stream) -> None:
     print(f"Tenant GUID    : {primary['tenant_id'] or '<unknown>'}", file=out_stream)
     print(f"Company / brand: {primary['company'] or '<unknown>'}", file=out_stream)
     print(f"Auth provider  : {primary.get('auth_provider') or '<unknown>'}", file=out_stream)
-    print(f"Tenant domains : {len(primary['tenant_domains'])} discovered", file=out_stream)
     print("=" * 70, file=out_stream)
+
+    verified = primary.get("verified_tenant_domains") or []
     print(file=out_stream)
+    print(f"Verified tenant domains (high certainty): {len(verified)}", file=out_stream)
+    for dom in verified:
+        print(f"    {dom}", file=out_stream)
+    print(file=out_stream)
+
     for rec in records:
         print(f"[{rec['domain']}]", file=out_stream)
         print(f"    company        : {rec['company'] or '<unknown>'}", file=out_stream)
         print(f"    namespace_type : {rec['namespace_type']}", file=out_stream)
         print(f"    auth_provider  : {rec.get('auth_provider') or '<unknown>'}", file=out_stream)
+        print(f"    same_tenant    : {rec.get('same_tenant', False)}", file=out_stream)
         print(f"    tenant_id      : {rec['tenant_id'] or '<none>'}", file=out_stream)
         print(f"    tenant_name    : {rec['tenant_name'] or '<none>'}", file=out_stream)
         print(f"    cloud_instance : {rec['cloud_instance'] or '<none>'}", file=out_stream)
@@ -1016,7 +1130,7 @@ def output_csv(records: List[Dict], out_stream) -> None:
         out_stream: File-like object to write to.
     """
     fields = [
-        "domain", "company", "namespace_type", "auth_provider",
+        "domain", "company", "namespace_type", "auth_provider", "same_tenant",
         "tenant_id", "tenant_name", "cloud_instance", "auth_url",
     ]
     writer = csv.DictWriter(out_stream, fieldnames=fields)
@@ -1081,15 +1195,39 @@ def run(args: argparse.Namespace) -> Tuple[Dict, List[Dict], Optional[Dict]]:
 
     # Additional domains to identify: tenant-discovered + file-supplied, with
     # the primary excluded (already processed above).
+    file_domains = load_domain_file(args.domain_file) if args.domain_file else []
     others = set(tenant_domains)
-    if args.domain_file:
-        others.update(load_domain_file(args.domain_file))
+    others.update(file_domains)
     others.discard(primary)
 
     records = [primary_record]
     for domain in sorted(others):
         logging.info(f"Identifying company for {domain} ...")
         records.append(identify_company(session, domain, args.timeout, tenant_name_cache))
+
+    # Flag which identified domains belong to the primary's tenant (GUID match).
+    for rec in records:
+        rec["same_tenant"] = (
+            primary_tenant_id is not None and rec.get("tenant_id") == primary_tenant_id
+        )
+
+    # Consolidated HIGH-CERTAINTY tenant domains: Microsoft-authoritative
+    # (ACS/GFI) + the onmicrosoft name + any candidate whose tenant GUID matches.
+    verified: set = {d for d in tenant_domains if d}
+    verified.add(primary)
+    if tenant_name:
+        verified.add(f"{tenant_name}.onmicrosoft.com")
+
+    candidate_pool: set = set(file_domains)
+    if args.crt:
+        logging.info("Seeding candidate domains from Certificate Transparency (crt.sh) ...")
+        candidate_pool.update(get_ct_domains(session, primary, args.timeout, args.crt_limit))
+    candidate_pool = {d for d in candidate_pool if d} - verified
+    if candidate_pool and primary_tenant_id:
+        logging.info(f"Verifying tenant membership of {len(candidate_pool)} candidate domain(s) ...")
+        verified.update(verify_tenant_membership(sorted(candidate_pool), primary_tenant_id, args.timeout))
+
+    primary_summary["verified_tenant_domains"] = sorted(verified)
 
     mfa_result: Optional[Dict] = None
     if args.mfa_test:
