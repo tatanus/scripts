@@ -8,6 +8,21 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+### Changed
+
+- Added explicit OS guards to the four Linux-only Bash scripts, which
+  previously ran bare `apt`, `systemctl`, and GNU `sed -i` on any platform
+  and would abort mid-run (often after a sudo prompt) on macOS. Each now
+  refuses up front with a clear reason:
+  - `bash/wireless.sh` — requires the Linux Wi-Fi stack (`iw`, `airmon-ng`,
+    `nmcli`) and `apt`.
+  - `bash/setup-mail-server.sh` — targets Debian/Ubuntu (`apt-get`, systemd,
+    Postfix/OpenDKIM).
+  - `bash/update_gophish.sh` — manages a systemd service and `/etc/gophish`
+    paths.
+  - `bash/update-mail-domain.sh` — edits `/etc/postfix` and reloads services
+    via `systemctl`.
+
 ### Added
 
 - `python/azure_tenant_enum.py` — resolve a DNS domain against Azure AD /

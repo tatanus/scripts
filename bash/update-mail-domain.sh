@@ -306,6 +306,13 @@ function reload_services() {
 # MAIN
 #==============================================================================
 function main() {
+    # Linux-only: edits /etc/postfix, /etc/opendkim.conf, /etc/aliases with GNU
+    # `sed -i` and reloads services via systemctl. validate_commands would flag
+    # a missing systemctl, but state the platform reason first.
+    if [[ "$(uname -s 2> /dev/null)" != "Linux" ]]; then
+        die 1 "update-mail-domain.sh targets Debian/Ubuntu (systemd + /etc/postfix); detected $(uname -s)."
+    fi
+
     validate_commands sed certbot opendkim-genkey newaliases systemctl
     gather_info
     backup_configs

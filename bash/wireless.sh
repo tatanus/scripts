@@ -41,6 +41,17 @@ if ((BASH_VERSINFO[0] < 4)); then
     fail "This script requires Bash version 4.0 or higher."
 fi
 
+# Linux-only: every capability here is Linux Wi-Fi stack -- iw, airmon-ng,
+# nmcli, monitor-mode drivers -- and install_dependencies drives `apt`. On
+# macOS the first apt call would abort mid-run after already prompting for
+# sudo, so refuse up front with a clear reason instead.
+case "$(uname -s 2> /dev/null)" in
+    Linux) ;;
+    *)
+        fail "wireless.sh is Linux-only (requires iw/airmon-ng/nmcli and apt); detected $(uname -s)."
+        ;;
+esac
+
 # Handle script interruption
 trap 'fail "Script interrupted."' INT TERM
 

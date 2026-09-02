@@ -67,11 +67,11 @@ copy.
 ├── CHANGELOG.md                # Keep a Changelog
 ├── bash/                       # standalone Bash utilities
 │   ├── auto-mount-shares.sh    # bulk SMB share mount helper
-│   ├── gophish_install.sh      # GoPhish installer
-│   ├── update_gophish.sh       # GoPhish updater
-│   ├── setup-mail-server.sh    # mail server bootstrap
-│   ├── update-mail-domain.sh   # mail-domain rotation
-│   ├── wireless.sh             # wireless interface helpers
+│   ├── gophish_install.sh      # GoPhish installer (Linux-only)
+│   ├── update_gophish.sh       # GoPhish updater (Linux-only)
+│   ├── setup-mail-server.sh    # mail server bootstrap (Debian/Ubuntu-only)
+│   ├── update-mail-domain.sh   # mail-domain rotation (Debian/Ubuntu-only)
+│   ├── wireless.sh             # wireless interface helpers (Linux-only)
 │   ├── mount-try.sh            # mount with backoff
 │   ├── logger.sh               # structured logging (see docs/LOGGER_README.md)
 │   ├── safe_source.sh          # safe re-sourcing helper (see docs/SAFE_SOURCE_README.md)

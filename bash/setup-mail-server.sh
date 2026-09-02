@@ -474,6 +474,14 @@ function health_check() {
 # MAIN
 #==============================================================================
 function main() {
+    # Debian/Ubuntu-only: apt-get, hostnamectl, and the Postfix/OpenDKIM
+    # packaging below are all Linux-specific. validate_commands would catch a
+    # missing apt-get, but only as a generic "command not found"; state the
+    # real reason first.
+    if [[ "$(uname -s 2> /dev/null)" != "Linux" ]]; then
+        die 1 "setup-mail-server.sh targets Debian/Ubuntu (needs apt-get/systemd); detected $(uname -s)."
+    fi
+
     validate_commands apt-get hostnamectl certbot opendkim-genkey postconf dig
     check_sendmail
     gather_info

@@ -144,6 +144,12 @@ function restart_gophish_service() {
 # Main Function
 #==============================================================================
 function main() {
+    # Linux-only: manages a systemd service and /etc/gophish, /etc/letsencrypt
+    # paths with GNU `sed -i` semantics. None of that applies on macOS.
+    if [[ "$(uname -s 2> /dev/null)" != "Linux" ]]; then
+        die 1 "update_gophish.sh targets Linux (systemd + /etc/gophish); detected $(uname -s)."
+    fi
+
     if [[ "$#" -ne 1 ]]; then
         echo "Usage: ${SCRIPT_NAME} <new-phish-domain>"
         die 1 "Invalid number of arguments"
