@@ -26,7 +26,9 @@ bash/internal/
     ├── 05-msf-import.sh        # db_import scan XML into Metasploit
     ├── 06-gowitness.sh        # screenshot web ip:ports -> responsive list
     ├── 07-httpx-nuclei.sh     # httpx probe + nuclei on responsive web
-    ├── 08-msf-modules.sh      # run every SCRIPTS/MSF/modules/*.rc
+    ├── 08-msf-modules.sh      # run SCRIPTS/MSF/modules/*.rc (delegates to
+    │                          #   run_all_modules.sh: single session + parses
+    │                          #   TEE for [+] successes; loop fallback)
     └── 09-netexec.sh          # nxc smb --pass-pol + nxc ldap
 ```
 

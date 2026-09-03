@@ -10,6 +10,17 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ### Changed
 
+- `bash/internal/tasks/08-msf-modules.sh` now hands off to the shipped
+  `run_all_modules.sh` (deployed by pentest_setup beside the MSF scripts) when
+  it can — running every module in a single `msfconsole` session and parsing
+  the `OUTPUT/TEE` spool logs for Metasploit successes (`[+]`), so an internal
+  run ends with a consolidated findings summary instead of just `.tee` files.
+  It passes `MSF_TEE_DIR`/`MSF_SCRIPTS_HOME`/`MSF_MODULES_DIR` so the engagement
+  paths line up. The previous per-module `msfconsole -q -r` loop is retained as
+  a fallback and is used when `MSF_MODULES_INCLUDE`/`_EXCLUDE` glob filters are
+  set, when the helper is absent, or when the install is relocated off the
+  canonical `/root/DATA` path (where the rc files' hardcoded runner-load line
+  must be rewritten).
 - Added explicit OS guards to the four Linux-only Bash scripts, which
   previously ran bare `apt`, `systemctl`, and GNU `sed -i` on any platform
   and would abort mid-run (often after a sudo prompt) on macOS. Each now

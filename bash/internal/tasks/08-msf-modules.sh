@@ -6,20 +6,26 @@
 ###############################################################################
 # TASK: 08-msf-modules
 # DESCRIPTION: Run every Metasploit resource script under
-#              ${MSF_SCRIPTS_DIR}/modules/*.rc with "msfconsole -q -r <rc>".
-#              Each rc loads msf_common_runner.rb and targets the hosts/services
-#              already imported into the MSF database (task 05). The runner's
-#              base/tee directory is steered via MSF_SCRIPTS_HOME so its spool
-#              logs land under ${DATA_DIR}/OUTPUT/TEE.
+#              ${MSF_SCRIPTS_DIR}/modules/*.rc against the hosts/services
+#              already imported into the MSF database (task 05).
 #
-#              The shipped rc files hardcode
+#              Preferred path: hand off to the shipped run_all_modules.sh
+#              (deployed beside the modules by pentest_setup). That runs all
+#              modules in a single msfconsole session (paying console/DB startup
+#              once) and then parses the OUTPUT/TEE spool logs for Metasploit
+#              successes ([+]) -- so an internal run ends with a consolidated
+#              findings summary instead of just a pile of .tee files.
+#
+#              Fallback path: a per-module "msfconsole -q -r <rc>" loop, used
+#              when run_all_modules.sh is absent, when glob filters are set
+#              (MSF_MODULES_INCLUDE / _EXCLUDE, richer than run_all_modules'
+#              single --pattern), or when the install is relocated off the
+#              canonical /root/DATA path (the shipped rc files hardcode
 #                  load '/root/DATA/TOOLS/SCRIPTS/MSF/msf_common_runner.rb'
-#              If the runner actually lives elsewhere (non-root HOME, lowercase
-#              'msf', etc.) we run patched temp copies pointing at the real
-#              path instead.
+#              which the loop rewrites in patched temp copies).
 #
-#              Selection is filterable via MSF_MODULES_INCLUDE / _EXCLUDE
-#              (space-separated basename globs, without the .rc suffix).
+#              Either way the runner's base/tee directory is steered via
+#              MSF_SCRIPTS_HOME so spool logs land under ${DATA_DIR}/OUTPUT/TEE.
 ###############################################################################
 
 set -uo pipefail
@@ -76,6 +82,50 @@ function _resolve_rc() {
 }
 
 ###############################################################################
+# _can_delegate
+# True when task 08 can safely hand off to the shipped run_all_modules.sh:
+#   - the helper exists beside the MSF scripts,
+#   - no include/exclude glob filters are set (run_all_modules takes a single
+#     --pattern; the inline loop supports the richer space-separated lists),
+#   - the install lives at the canonical /root/DATA path, so the rc files'
+#     hardcoded `load '/root/DATA/.../msf_common_runner.rb'` lines resolve
+#     inside run_all_modules' concatenated resource (the inline loop is the
+#     one that rewrites that path for relocated installs).
+###############################################################################
+function _can_delegate() {
+    [[ -f "${MSF_SCRIPTS_DIR}/run_all_modules.sh" ]] || return 1
+    [[ -z "${MSF_MODULES_INCLUDE:-}" && -z "${MSF_MODULES_EXCLUDE:-}" ]] || return 1
+    [[ "${MSF_SCRIPTS_DIR}/msf_common_runner.rb" == "${MSF_HARDCODED_RUNNER}" ]] || return 1
+    return 0
+}
+
+###############################################################################
+# _run_via_run_all
+# Delegate to run_all_modules.sh: single msfconsole session + TEE success
+# parsing. MSF_TEE_DIR points its parser at the engagement TEE; MSF_SCRIPTS_HOME
+# steers the runner's spool to the same place; MSF_MODULES_DIR is explicit so
+# it never guesses the wrong directory.
+###############################################################################
+function _run_via_run_all() {
+    local helper="${MSF_SCRIPTS_DIR}/run_all_modules.sh"
+    local tee_log
+    tee_log="${TEE_DIR}/msf_modules_run_all_$(date +%Y%m%d_%H%M%S).tee"
+
+    local -a cmd=(bash "${helper}")
+    internal::is_dry_run && cmd+=(--dry-run)
+
+    LOG info "Delegating to run_all_modules.sh (single session + success parsing)"
+    MSF_MODULES_DIR="${MSF_SCRIPTS_DIR}/modules" \
+        MSF_TEE_DIR="${TEE_DIR}" \
+        MSF_SCRIPTS_HOME="${DATA_DIR}" \
+        "${cmd[@]}" 2>&1 | tee -a "${tee_log}" || {
+        LOG warn "run_all_modules.sh returned non-zero"
+    }
+    LOG pass "run_all_modules.sh complete; combined log: ${tee_log}"
+    return 0
+}
+
+###############################################################################
 # run_task_08_msf_modules
 ###############################################################################
 function run_task_08_msf_modules() {
@@ -90,6 +140,13 @@ function run_task_08_msf_modules() {
     mkdir -p "${MSF_OUT_DIR}" "${TEE_DIR}"
     # Steer msf_common_runner.rb's base_dir (=> OUTPUT/TEE) to the engagement.
     export MSF_SCRIPTS_HOME="${DATA_DIR}"
+
+    # Preferred path: the shipped single-session runner with success parsing.
+    if _can_delegate; then
+        _run_via_run_all
+        return 0
+    fi
+    LOG info "Using per-module fallback loop (filters set, helper absent, or relocated install)"
 
     local -a rc_files=()
     local f name
