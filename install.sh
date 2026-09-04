@@ -81,6 +81,9 @@ readonly COMMON_CORE_DIR="${HOME}/.config/bash/lib/common_core"
 readonly COMMON_CORE_UTIL="${COMMON_CORE_DIR}/util.sh"
 readonly BASH_RC="${HOME}/.bashrc"
 readonly TARGET_ROOT="${HOME}/DATA/TOOLS/SCRIPTS"
+# Marker written on a successful install; its presence (and contents) let a
+# later run detect a prior install and prompt before overwriting.
+readonly SCRIPTS_VERSION_FILE="${TARGET_ROOT}/VERSION"
 
 # Source trees in this repo (relative to SCRIPT_DIR)
 readonly -a SOURCE_TREES=(
@@ -112,7 +115,7 @@ OPTIONS:
     -h, --help      Show this help message
     -v, --version   Show version
     -q, --quiet     Suppress non-error output
-    -f, --force     Force overwrite without checksum comparison
+    -f, --force     Update over an existing install without prompting
     -n, --dry-run   Preview actions without making any changes
 
 EXAMPLES:
@@ -450,13 +453,65 @@ function remove_tree() {
 # Commands
 #===============================================================================
 
+###############################################################################
+# confirm_overwrite
+#------------------------------------------------------------------------------
+# Purpose  : When a prior install is detected (SCRIPTS_VERSION_FILE exists),
+#            decide whether to proceed. FORCE=true or DRY_RUN=true proceed
+#            without prompting; a non-interactive shell refuses (advise
+#            --force); otherwise ask [y/N].
+# Returns  : 0 to proceed, 1 to abort.
+###############################################################################
+function confirm_overwrite() {
+    [[ -f "${SCRIPTS_VERSION_FILE}" ]] || return 0
+
+    local installed="unknown"
+    installed="$(cat "${SCRIPTS_VERSION_FILE}" 2> /dev/null || printf 'unknown')"
+    info "Existing ${SCRIPT_NAME} install detected: version ${installed}"
+
+    if [[ "${FORCE}" == "true" ]]; then
+        info "Force mode: updating over existing install (${installed} -> ${VERSION})"
+        return 0
+    fi
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        info "[DRY-RUN] would prompt to overwrite existing install (${installed} -> ${VERSION})"
+        return 0
+    fi
+    if [[ ! -t 0 ]]; then
+        info "Non-interactive shell; updating existing install (${installed} -> ${VERSION})"
+        return 0
+    fi
+
+    local reply
+    printf '%s %s already installed; update to %s? [y/N] ' \
+        "${SCRIPT_NAME}" "${installed}" "${VERSION}" >&2
+    read -r reply
+    case "${reply}" in
+        [yY] | [yY][eE][sS]) return 0 ;;
+        *)
+            info "Left existing installation unchanged."
+            return 1
+            ;;
+    esac
+}
+
 function cmd_install() {
     local t rc=0
+
+    # Detect a prior install and confirm before overwriting (unless --force).
+    confirm_overwrite || return 0
+
     ensure_target_root || return 1
     for t in "${SOURCE_TREES[@]}"; do
         deploy_tree "${t}" || rc=1
     done
+
     if ((rc == 0)); then
+        # Record the installed version so a later run can detect this install.
+        if [[ "${DRY_RUN}" != "true" ]]; then
+            printf '%s\n' "${VERSION}" > "${SCRIPTS_VERSION_FILE}" 2> /dev/null ||
+                warn "Could not write version marker: ${SCRIPTS_VERSION_FILE}"
+        fi
         pass "Installation complete."
     else
         fail "Installation had errors."
@@ -476,6 +531,8 @@ function cmd_uninstall() {
     for t in "${SOURCE_TREES[@]}"; do
         remove_tree "${t}" || rc=1
     done
+    # Drop the version marker so a later install is treated as fresh.
+    [[ "${DRY_RUN}" != "true" ]] && rm -f "${SCRIPTS_VERSION_FILE}" 2> /dev/null
     if ((rc == 0)); then
         pass "Uninstall complete."
     else

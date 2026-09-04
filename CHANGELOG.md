@@ -10,6 +10,12 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ### Changed
 
+- `install.sh install` now detects a previous install (via a new
+  `${TARGET_ROOT}/VERSION` marker) and, when run interactively, prompts before
+  overwriting/updating it. `-f`/`--force` bypasses the prompt; `--dry-run`
+  never prompts; a non-interactive shell proceeds. The marker is written after
+  a successful install and removed on uninstall. (`update` is unaffected — its
+  checksum comparison already governs re-copies.)
 - `bash/internal/tasks/08-msf-modules.sh` now hands off to the shipped
   `run_all_modules.sh` (deployed by pentest_setup beside the MSF scripts) when
   it can — running every module in a single `msfconsole` session and parsing

@@ -53,7 +53,9 @@ make install   # equivalent to: bash install.sh
 `${HOME}/DATA/TOOLS/SCRIPTS/`, creating the directory (and parents) if
 missing. Use `bash install.sh update` to refresh only the changed files
 on subsequent runs, or `bash install.sh uninstall` to remove the deployed
-copy.
+copy. Re-running `install` over an existing install prompts for confirmation
+when run interactively (a `${HOME}/DATA/TOOLS/SCRIPTS/VERSION` marker records
+the prior install); pass `-f`/`--force` to update without prompting.
 
 ---
 
