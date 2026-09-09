@@ -161,13 +161,13 @@ Engagement directory created: $(date)
 3. Run reconnaissance:
    \`\`\`bash
    # Quick scan
-   /path/to/run_external_recon_suite.sh --config /path/to/quick.conf
+   /path/to/run_recon.sh -e ENGAGEMENT_DIR -t targets.txt -d domains.txt --config /path/to/unified-quick.conf
 
    # Default scan
-   /path/to/run_external_recon_suite.sh
+   /path/to/run_recon.sh -e ENGAGEMENT_DIR -t targets.txt -d domains.txt --config /path/to/unified-default.conf
 
    # Aggressive scan
-   /path/to/run_external_recon_suite.sh --config /path/to/aggressive.conf
+   /path/to/run_recon.sh -e ENGAGEMENT_DIR -t targets.txt -d domains.txt --config /path/to/unified-aggressive.conf
    \`\`\`
 
 ## Directory Structure
@@ -231,7 +231,7 @@ EOF
     echo ""
     printf '%b\n' "  4. Run reconnaissance:"
     printf '%b\n' "     ${YELLOW}cd $(dirname "${BASH_SOURCE[0]}")${NC}"
-    printf '%b\n' "     ${YELLOW}./run_external_recon_suite.sh${NC}"
+    printf '%b\n' "     ${YELLOW}./run_recon.sh -e \"${engagement_dir}\" -t \"${engagement_dir}/targets.txt\" -d \"${engagement_dir}/domains.txt\"${NC}"
     echo ""
 }
 

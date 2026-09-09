@@ -82,10 +82,11 @@ the prior install); pass `-f`/`--force` to update without prompting.
 │   │   ├── internal_lib.sh           # common_core bootstrap + DATA/ paths + helpers
 │   │   ├── config/default.conf       # overridable paths / tunables / task toggles
 │   │   └── tasks/                    # 00-validate … 09-netexec (drop in NN-name.sh)
-│   └── recon/                  # external reconnaissance mini-framework
-│       ├── FRAMEWORK_OVERVIEW.md
-│       ├── README_RECON_SUITE.md
-│       ├── run_external_recon_suite.sh
+│   └── recon/                  # external reconnaissance framework
+│       ├── FRAMEWORK_OVERVIEW.md, README_RECON_SUITE.md, README_UNIFIED.md
+│       ├── run_recon.sh        # unified orchestrator (phase-based)
+│       ├── lib/                # recon_lib.sh, scope_lib.sh, discovery_lib.sh
+│       ├── phases/             # 00-validate … 07-report (drop in NN-name.sh)
 │       ├── dns_email_recon.sh, dns_utils.sh
 │       ├── entra_azure_recon.sh, msgraph_recon.sh
 │       ├── m365_recon_NG.sh
@@ -95,8 +96,7 @@ the prior install); pass `-f`/`--force` to update without prompting.
 │       ├── osint.sh
 │       ├── setup_engagement.sh
 │       ├── analysis_and_output.sh
-│       ├── config/             # default config for the recon framework
-│       └── examples/
+│       └── config/             # unified-{quick,default,aggressive}.conf
 ├── python/                     # standalone Python utilities
 │   ├── ad_dns_enum.py          # Active Directory DNS enumeration
 │   ├── azure_tenant_enum.py    # Azure AD tenant/domain/company enumeration
@@ -125,8 +125,10 @@ the prior install); pass `-f`/`--force` to update without prompting.
   `debug`/`pass`/`fail`). See [`docs/LOGGER_README.md`](docs/LOGGER_README.md).
 - `bash/safe_source.sh` — safely re-source other shell scripts and roll
   back env changes. See [`docs/SAFE_SOURCE_README.md`](docs/SAFE_SOURCE_README.md).
-- `bash/recon/` — see its own [`FRAMEWORK_OVERVIEW.md`](bash/recon/FRAMEWORK_OVERVIEW.md)
-  and [`README_RECON_SUITE.md`](bash/recon/README_RECON_SUITE.md).
+- `bash/recon/` — unified external-recon framework (`run_recon.sh`). See its own
+  [`FRAMEWORK_OVERVIEW.md`](bash/recon/FRAMEWORK_OVERVIEW.md),
+  [`README_RECON_SUITE.md`](bash/recon/README_RECON_SUITE.md) and
+  [`README_UNIFIED.md`](bash/recon/README_UNIFIED.md).
 - `bash/recon/m365_recon_NG.sh` — see [`docs/M365_RECON_NG.md`](docs/M365_RECON_NG.md).
 - `bash/internal/` — modular internal penetration-test suite (spoonmap →
   Metasploit → gowitness/httpx/nuclei → NetExec). See its own

@@ -8,6 +8,24 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+### Added
+
+- Unified external-recon framework under `bash/recon/`: a phase-based
+  orchestrator `run_recon.sh` (v2.0.0) with `lib/` (recon_lib, scope_lib,
+  discovery_lib) and `phases/` (`00-validate` … `07-report`), plus
+  `config/unified-{quick,default,aggressive}.conf` and `README_UNIFIED.md`.
+  Merges the staged scanning engine of `bash/recon_new.sh` with the breadth of
+  the previous task-based suite; adds naabu (fast port sweep), tldfinder,
+  urlfinder and vulnx, and selectable port-scan engines (nmap/naabu/spoonmap).
+
+### Removed
+
+- Superseded task-based recon entrypoint `bash/recon/run_external_recon_suite.sh`,
+  its `bash/recon/tasks/00-validate.sh … 04-testssl.sh`, and the old
+  `bash/recon/config/{default,quick,aggressive}.conf` profiles. Their behavior
+  is now provided by `run_recon.sh` + `phases/` + `config/unified-*.conf`.
+  (An untracked `bash/old_recon/` copy remains as a local archive.)
+
 ### Changed
 
 - `install.sh install` now detects a previous install (via a new

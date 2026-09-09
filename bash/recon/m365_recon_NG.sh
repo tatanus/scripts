@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034,SC2154
 # Rationale:
-# - SC2154: CURL_UA is sourced from the external recon-suite config
-#   (run_external_recon_suite.sh exports it before invocation).
+# - SC2154: CURL_UA is provided by web_utils.sh (sourced below);
+#   web_utils.sh (sourced by this script) defines it.
 # - SC2034: ENABLE_COLOR / ENABLE_FILE_LOGGING are user-tunable knobs
 #   exposed at module level; they are read by helper functions that
 #   ShellCheck does not follow.

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034,SC2154
 # Rationale:
-# - SC2154: CURL_UA / TARGETS_FILE sourced from the recon-suite config
-#   (run_external_recon_suite.sh exports them before invocation).
+# - SC2154: CURL_UA comes from web_utils.sh (sourced via m365_recon_NG.sh)
+#   and TARGETS_FILE from run_recon.sh; ShellCheck cannot follow that chain.
 # - SC2034: local helper-capture vars (r, r2, ua, results) are kept for
 #   readability / future use during the iterative refactor of this module.
 
