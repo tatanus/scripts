@@ -59,7 +59,7 @@ function vuln_nuclei() {
     local templates="${RECON_NUCLEI_TEMPLATES:-${RECON_NUCLEI_TEMPLATES_DEFAULT}}"
     LOG info "nuclei: template scan"
     run_pipe "cat $(printf '%q' "${urls}") | httpx -silent -threads ${RECON_THREADS:-50} \
-        | nuclei -ni -o $(printf '%q' "${d}/nuclei.out") ${templates}" ||
+        | nuclei -ni -o $(printf '%q' "${d}/nuclei.out") ${templates}" nuclei ||
         LOG warn "nuclei returned non-zero"
     return 0
 }
@@ -82,7 +82,7 @@ function vuln_vulnx() {
     fi
     LOG info "vulnx: enriching $(count_lines "${cves}") CVE ID(s)"
     run_pipe "vulnx id --file $(printf '%q' "${cves}") --json \
-        --output $(printf '%q' "${d}/vulnx.json") 2>/dev/null || true"
+        --output $(printf '%q' "${d}/vulnx.json") 2>/dev/null || true" vulnx
     return 0
 }
 

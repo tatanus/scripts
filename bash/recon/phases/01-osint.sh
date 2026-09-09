@@ -125,9 +125,9 @@ function run_phase_osint() {
     if have_cmd dnsx && [[ -s "${subs}" ]]; then
         LOG info "dnsx: resolving enumerated names (A/ASN/recursion)"
         run_pipe "cat $(printf '%q' "${subs}") | dnsx -a -asn -re -silent \
-            -t ${RECON_THREADS:-50} -o $(printf '%q' "${d}/dnsx.txt")" || true
+            -t ${RECON_THREADS:-50} -o $(printf '%q' "${d}/dnsx.txt")" dnsx || true
         run_pipe "cat $(printf '%q' "${subs}") | dnsx -a -resp-only -silent \
-            -t ${RECON_THREADS:-50} | sort -u > $(printf '%q' "${RECON_OUTDIR}/resolved-ips.txt")" || true
+            -t ${RECON_THREADS:-50} | sort -u > $(printf '%q' "${RECON_OUTDIR}/resolved-ips.txt")" dnsx || true
         LOG pass "$(count_lines "${RECON_OUTDIR}/resolved-ips.txt") resolved IP(s) recorded (not scanned)"
     fi
 

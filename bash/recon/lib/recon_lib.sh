@@ -219,17 +219,45 @@ if [[ -z "${RECON_LIB_LOADED:-}" ]]; then
         done
         LOG debug "\$${pretty}"
         [[ "${RECON_DRY_RUN:-0}" -eq 1 ]] && return 0
+        # Mirror the tool's combined stdout+stderr to a per-tool tee file, so
+        # every tool's output is saved even when the caller silences the
+        # terminal with `> /dev/null 2>&1` (that only redirects tee's
+        # passthrough; the file still captures every line).
+        if [[ -n "${RECON_TEE_DIR:-}" ]]; then
+            mkdir -p "${RECON_TEE_DIR}" 2> /dev/null || true
+            local label="${1}"
+            [[ "${label}" == "sudo" ]] && [[ $# -ge 2 ]] && label="${2}"
+            "$@" 2>&1 | tee -a "$(recon_tee_file "${label}")"
+            return "${PIPESTATUS[0]}"
+        fi
         "$@"
+    }
+
+    ###########################################################################
+    # recon_tee_file
+    # Purpose : Path of a per-tool tee file: OUTPUT/TEE/<label>.<ts>.tee
+    # Args    : $1 - label (usually the tool name)
+    ###########################################################################
+    function recon_tee_file() {
+        local label
+        label="$(basename -- "${1:-cmd}")"
+        printf '%s/%s.%s.tee\n' "${RECON_TEE_DIR}" "${label}" "$(date +%Y%m%d_%H%M%S)"
     }
 
     ###########################################################################
     # run_pipe
     # Purpose : Log a string-form shell pipeline then eval it, unless dry-run.
-    # Args    : $1 - pipeline string (already properly quoted by the caller)
+    # Args    : $1 - pipeline string (already quoted by the caller)
+    #           $2 - optional label for the tee file (defaults to "pipe")
     ###########################################################################
     function run_pipe() {
         LOG debug "\$ ${1}"
         [[ "${RECON_DRY_RUN:-0}" -eq 1 ]] && return 0
+        if [[ -n "${RECON_TEE_DIR:-}" ]]; then
+            mkdir -p "${RECON_TEE_DIR}" 2> /dev/null || true
+            eval "${1}" 2>&1 | tee -a "$(recon_tee_file "${2:-pipe}")"
+            return "${PIPESTATUS[0]}"
+        fi
         eval "${1}"
     }
 

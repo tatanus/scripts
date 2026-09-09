@@ -332,13 +332,27 @@ function main() {
 
     RECON_OUTDIR="${RECON_ENGAGEMENT_DIR}/RECON"
     RECON_STATE_DIR="${RECON_OUTDIR}/.state"
-    mkdir -p "${RECON_STATE_DIR}"
+    RECON_TEE_DIR="${RECON_ENGAGEMENT_DIR}/OUTPUT/TEE"
+    mkdir -p "${RECON_STATE_DIR}" "${RECON_TEE_DIR}" \
+        "${RECON_ENGAGEMENT_DIR}/LOGS"
 
-    recon_init_logging "${RECON_ENGAGEMENT_DIR}/LOGS/recon_$(date +%Y%m%d_%H%M%S).log"
+    local ts
+    ts="$(date +%Y%m%d_%H%M%S)"
+    recon_init_logging "${RECON_ENGAGEMENT_DIR}/LOGS/recon_${ts}.log"
+
+    # Master session log: capture ALL stdout+stderr of this run (progress,
+    # tool passthrough, errors) to one file while still showing on the
+    # terminal. Per-tool output additionally lands in OUTPUT/TEE/ via run().
+    if [[ "${RECON_DRY_RUN:-0}" -eq 0 ]]; then
+        RECON_FULL_LOG="${RECON_ENGAGEMENT_DIR}/LOGS/recon_${ts}.full.log"
+        exec > >(tee -a "${RECON_FULL_LOG}") 2>&1
+    fi
+
     trap recon_on_interrupt INT TERM
 
     LOG info "Unified External Recon v${RECON_VERSION}"
     LOG info "engagement=${RECON_ENGAGEMENT_DIR} engine=${RECON_ENGINE}"
+    LOG info "tee dir=${RECON_TEE_DIR}"
 
     # Validate the selected phase names (newline-split so IFS=$'\n\t' is fine).
     local p

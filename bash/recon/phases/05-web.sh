@@ -88,7 +88,7 @@ function run_phase_web() {
     if have_cmd urlfinder && [[ -n "${DOMAINS_FILE:-}" ]] && [[ -s "${DOMAINS_FILE}" ]]; then
         LOG info "urlfinder: passive URL discovery"
         run_pipe "urlfinder -list $(printf '%q' "${DOMAINS_FILE}") -silent \
-            >> $(printf '%q' "${d}/urlfinder.txt") 2>/dev/null || true"
+            >> $(printf '%q' "${d}/urlfinder.txt") 2>/dev/null || true" urlfinder
         if [[ -s "${d}/urlfinder.txt" ]]; then
             cat "${d}/urlfinder.txt" >> "${urls}" 2> /dev/null || true
             [[ -s "${urls}" ]] && sort -u -o "${urls}" "${urls}"
@@ -100,7 +100,7 @@ function run_phase_web() {
         LOG info "httpx: fingerprinting $(count_lines "${urls}") URL(s)"
         run_pipe "cat $(printf '%q' "${urls}") \
             | httpx -title -status-code -web-server -vhost -threads ${RECON_THREADS:-50} \
-              -o $(printf '%q' "${d}/httpx.out")" || LOG warn "httpx returned non-zero"
+              -o $(printf '%q' "${d}/httpx.out")" httpx || LOG warn "httpx returned non-zero"
         export RECON_LIVE_URLS="${urls}"
     fi
 
@@ -108,7 +108,7 @@ function run_phase_web() {
     if have_cmd whatweb && [[ -s "${urls}" ]]; then
         LOG info "whatweb: technology fingerprinting"
         run_pipe "whatweb -i $(printf '%q' "${urls}") --log-brief=$(printf '%q' "${d}/whatweb.txt") \
-            --no-errors >/dev/null 2>&1" || LOG warn "whatweb returned non-zero"
+            --no-errors >/dev/null 2>&1" whatweb || LOG warn "whatweb returned non-zero"
     fi
 
     if [[ -s "${urls}" ]]; then
