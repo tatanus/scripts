@@ -408,6 +408,10 @@ function deploy_tree() {
         fi
     done < <(find "${src_root}" -type f)
 
+    # Make every deployed *.sh executable, including files that were skipped
+    # this run as unchanged (they never pass through the copy chmod above).
+    find "${dst_root}" -type f -name '*.sh' -exec chmod +x {} + 2> /dev/null || true
+
     info "${tree}: copied=${copied} skipped=${skipped} failed=${failed}"
     ((failed == 0))
 }
