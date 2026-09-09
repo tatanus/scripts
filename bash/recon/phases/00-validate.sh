@@ -55,9 +55,12 @@ function run_phase_validate() {
             LOG error "failed to expand ${TARGETS_FILE}"
             return "${RECON_ERR_INPUT}"
         }
+        # scope_expand prints "<ips> <hosts> <over-cap> <unparsed>". Re-admit
+        # space to IFS (the suite runs under IFS=$'\n\t') so the counts split.
+        local IFS=$' \t\n'
         # shellcheck disable=SC2086
         set -- ${stats}
-        LOG pass "expanded scope: ${1} IP(s), ${2} hostname(s)"
+        LOG pass "expanded scope: ${1:-0} IP(s), ${2:-0} hostname(s)"
         [[ "${3:-0}" -gt 0 ]] && LOG warn "hit --max-hosts cap (${RECON_MAX_HOSTS}); ${3} address(es) dropped"
         [[ "${4:-0}" -gt 0 ]] && LOG warn "${4} unparsed scope line(s) - review ${TARGETS_FILE}"
         export RECON_EXPANDED_TARGETS="${expanded}"
