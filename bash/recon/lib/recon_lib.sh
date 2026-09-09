@@ -101,6 +101,30 @@ if [[ -z "${RECON_LIB_LOADED:-}" ]]; then
     }
 
     ###########################################################################
+    # recon_abspath
+    # Purpose : Resolve a path to absolute form so it survives a later `cd`.
+    #           Existing dirs/files are canonicalized; a not-yet-created path
+    #           is rooted at $PWD (kept absolute, good enough for mkdir/cd).
+    # Args    : $1 - path
+    ###########################################################################
+    function recon_abspath() {
+        local p="${1}"
+        if [[ -d "${p}" ]]; then
+            (cd "${p}" > /dev/null 2>&1 && pwd)
+        elif [[ -e "${p}" ]]; then
+            local dir base
+            dir="$(cd "$(dirname "${p}")" > /dev/null 2>&1 && pwd)"
+            base="$(basename "${p}")"
+            printf '%s/%s\n' "${dir}" "${base}"
+        else
+            case "${p}" in
+                /*) printf '%s\n' "${p}" ;;
+                *) printf '%s/%s\n' "$(pwd)" "${p}" ;;
+            esac
+        fi
+    }
+
+    ###########################################################################
     # need_file
     # Purpose : Abort the current phase unless a file exists and is non-empty.
     # Args    : $1 - path

@@ -323,6 +323,13 @@ function main() {
         exit "${RECON_ERR_INPUT}"
     fi
 
+    # Resolve inputs to absolute paths NOW: several phases cd into output
+    # subdirectories (gowitness, spoonmap) before referencing these, so a
+    # relative --engagement/--targets/--domains would break after the cd.
+    RECON_ENGAGEMENT_DIR="$(recon_abspath "${RECON_ENGAGEMENT_DIR}")"
+    TARGETS_FILE="$(recon_abspath "${TARGETS_FILE}")"
+    [[ -n "${DOMAINS_FILE:-}" ]] && DOMAINS_FILE="$(recon_abspath "${DOMAINS_FILE}")"
+
     RECON_OUTDIR="${RECON_ENGAGEMENT_DIR}/RECON"
     RECON_STATE_DIR="${RECON_OUTDIR}/.state"
     mkdir -p "${RECON_STATE_DIR}"

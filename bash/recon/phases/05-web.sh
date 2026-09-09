@@ -52,12 +52,29 @@ function run_phase_web() {
         else
             LOG warn "no derived web targets - run the portscan phase first for a narrowed list"
             LOG warn "falling back to expanded scope with a large port list (slow)"
-            (
-                cd "${d}" && run gowitness scan file \
-                    -f "${RECON_EXPANDED_TARGETS:-${TARGETS_FILE}}" \
-                    --threads "${GW_THREADS:-40}" --timeout "${GW_TIMEOUT:-10}" \
-                    --delay "${GW_DELAY:-2}" --write-db --write-csv --write-jsonl --ports-large
-            ) || LOG warn "gowitness returned non-zero"
+            # gowitness cannot expand CIDRs, so hand it one address per line.
+            local expanded="${d}/expanded-scope.txt"
+            if [[ -n "${RECON_EXPANDED_TARGETS:-}" ]] && [[ -s "${RECON_EXPANDED_TARGETS}" ]]; then
+                cp "${RECON_EXPANDED_TARGETS}" "${expanded}"
+            elif [[ -s "${RECON_OUTDIR}/targets-expanded.txt" ]]; then
+                cp "${RECON_OUTDIR}/targets-expanded.txt" "${expanded}"
+            else
+                scope_expand "${TARGETS_FILE}" "${RECON_MAX_HOSTS:-8192}" \
+                    "${d}/.ips" "${d}/.names" > /dev/null 2>&1 || true
+                cat "${d}/.ips" "${d}/.names" 2> /dev/null | sed -e '/^$/d' |
+                    sort -u > "${expanded}"
+                rm -f "${d}/.ips" "${d}/.names"
+            fi
+            if [[ ! -s "${expanded}" ]]; then
+                LOG warn "no usable targets to screenshot - skipping gowitness"
+            else
+                LOG info "gowitness: $(count_lines "${expanded}") address(es) x large port list"
+                (
+                    cd "${d}" && run gowitness scan file -f "${expanded}" \
+                        --threads "${GW_THREADS:-40}" --timeout "${GW_TIMEOUT:-10}" \
+                        --delay "${GW_DELAY:-2}" --write-db --write-csv --write-jsonl --ports-large
+                ) || LOG warn "gowitness returned non-zero"
+            fi
         fi
     else
         LOG info "gowitness not installed - skipping screenshots"
