@@ -8,7 +8,25 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+### Fixed
+
+- `bash/recon`: phase `00-validate` no longer crashes with `line 60: 2:
+  unbound variable` under `set -u`. `scope_expand`'s space-separated counts
+  were not split because the suite runs under `IFS=$'\n\t'`; a local `IFS`
+  now re-admits the space (and the positionals are defaulted).
+- `bash/recon`: `--engagement`/`--targets`/`--domains` are resolved to
+  absolute paths up front (new `recon_abspath`), so phases that `cd` into
+  output subdirs (gowitness, spoonmap) no longer fail with `source is not
+  readable` when relative paths are passed. The phase-05 gowitness fallback
+  also now feeds an expanded one-address-per-line list instead of raw
+  `targets.txt` (gowitness cannot expand CIDRs).
+
 ### Added
+
+- `bash/recon`: every tool's output is saved. `run`/`run_pipe` mirror each
+  tool's combined stdout+stderr to `OUTPUT/TEE/<tool>.<ts>.tee` (captured
+  even when the terminal is silenced with `> /dev/null 2>&1`), and a master
+  session log `LOGS/recon_<ts>.full.log` captures all STDOUT/STDERR of the run.
 
 - Unified external-recon framework under `bash/recon/`: a phase-based
   orchestrator `run_recon.sh` (v2.0.0) with `lib/` (recon_lib, scope_lib,
@@ -28,6 +46,11 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ### Changed
 
+- `install.sh` now marks every deployed `*.sh` executable after each subtree
+  copy (a blanket `find … -name '*.sh' -exec chmod +x` pass), including files
+  skipped as unchanged. Previously only sources that already carried the exec
+  bit were made executable, so sourced-but-not-executable scripts (the recon
+  `lib/`/`phases/` and intel modules) deployed non-executable.
 - `install.sh install` now detects a previous install (via a new
   `${TARGET_ROOT}/VERSION` marker) and, when run interactively, prompts before
   overwriting/updating it. `-f`/`--force` bypasses the prompt; `--dry-run`
