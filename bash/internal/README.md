@@ -21,7 +21,7 @@ bash/internal/
     ├── 00-validate.sh         # verify (or prompt for) targets.txt; make dirs
     ├── 01-excludes.sh         # iptables DROP for excludes.txt (own chain)
     ├── 02-dns-lookup.sh       # nmap -sL PTR sweep (expands CIDRs); harvest domains
-    ├── 03-domain-controllers.sh # AD DC SRV lookups per domain
+    ├── 03-domain-controllers.sh # AD DC discovery: SRV + apex-A per domain
     ├── 04-spoonmap.sh         # TrustedSec spoonmap scan -> hosts/ip:ports
     ├── 05-msf-import.sh        # db_import scan XML into Metasploit
     ├── 06-gowitness.sh        # screenshot web ip:ports -> responsive list

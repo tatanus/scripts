@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2154
-# Rationale: DOMAINS_FOUND_FILE / DOMAINS_FILE / DNS_OUT_DIR / DC_FILE and the
-# LOG / internal::* helpers come from internal_lib.sh.
+# Rationale: DOMAINS_FOUND_FILE / DOMAINS_FILE / DNS_OUT_DIR / DC_FILE /
+# DNS_SERVERS and the LOG / internal::* helpers come from internal_lib.sh.
 
 ###############################################################################
 # TASK: 03-domain-controllers
 # DESCRIPTION: For every domain identified in task 02 (plus any seed
-#              domains.txt), query the AD SRV records that advertise domain
-#              controllers and resolve them to IPs. Writes a de-duplicated list
-#              of DC hostnames/IPs to domain_controllers.txt .
+#              domains.txt), locate the Active Directory domain controllers via
+#              DNS and resolve them to IPs. Writes a de-duplicated list of DC
+#              hostnames/IPs to domain_controllers.txt .
+#
+#              Two complementary DNS methods are used per domain:
+#                1. SRV records that advertise DCs (_ldap._tcp.dc._msdcs, ...).
+#                2. A record of the bare domain apex ("DA" lookup) -- in AD the
+#                   domain name itself resolves to every DC's IP.
+#
+#              Internal PTR/SRV/A records only resolve against the environment's
+#              own DNS (typically the DCs), so queries honor DNS_SERVERS the
+#              same way task 02 does.
 ###############################################################################
 
 set -uo pipefail
@@ -23,34 +32,34 @@ readonly -a DC_SRV_PREFIXES=(
 )
 
 ###############################################################################
-# _srv_targets <domain>  -> prints SRV target hostnames
+# _srv_targets <domain> [server]  -> prints SRV target hostnames
 ###############################################################################
 function _srv_targets() {
-    local domain="${1}" prefix fqdn
+    local domain="${1}" server="${2:-}" prefix fqdn
     for prefix in "${DC_SRV_PREFIXES[@]}"; do
         fqdn="${prefix}.${domain}"
         if cmd::exists dig; then
             # SRV answer: prio weight port target
-            dig +short SRV "${fqdn}" 2> /dev/null | awk '{print $4}' | sed 's/\.$//'
+            dig +short SRV "${fqdn}" ${server:+@"${server}"} 2> /dev/null | awk '{print $4}' | sed 's/\.$//'
         elif cmd::exists host; then
-            host -t SRV "${fqdn}" 2> /dev/null | awk '/SRV record/ {print $NF}' | sed 's/\.$//'
+            host -t SRV "${fqdn}" ${server:+"${server}"} 2> /dev/null | awk '/SRV record/ {print $NF}' | sed 's/\.$//'
         elif cmd::exists nslookup; then
-            nslookup -type=SRV "${fqdn}" 2> /dev/null | awk '/service =/ {print $NF}' | sed 's/\.$//'
+            nslookup -type=SRV "${fqdn}" ${server:+"${server}"} 2> /dev/null | awk '/service =/ {print $NF}' | sed 's/\.$//'
         fi
     done
 }
 
 ###############################################################################
-# _resolve_a <host>  -> prints A record(s)
+# _resolve_a <host> [server]  -> prints A record(s)
 ###############################################################################
 function _resolve_a() {
-    local name="${1}"
+    local name="${1}" server="${2:-}"
     if cmd::exists dig; then
-        dig +short A "${name}" 2> /dev/null
+        dig +short A "${name}" ${server:+@"${server}"} 2> /dev/null
     elif cmd::exists host; then
-        host "${name}" 2> /dev/null | awk '/has address/ {print $NF}'
+        host "${name}" ${server:+"${server}"} 2> /dev/null | awk '/has address/ {print $NF}'
     elif cmd::exists nslookup; then
-        nslookup "${name}" 2> /dev/null | awk '/^Address: / {print $2}'
+        nslookup "${name}" ${server:+"${server}"} 2> /dev/null | awk '/^Address: / {print $2}'
     fi
 }
 
@@ -72,6 +81,14 @@ function run_task_03_domain_controllers() {
         return 0
     fi
 
+    # dig/host/nslookup take a single server; use the first of DNS_SERVERS.
+    local server="${DNS_SERVERS%%,*}"
+    if [[ -n "${server}" ]]; then
+        LOG info "Querying internal DNS server: ${server}"
+    else
+        LOG info "Using the host's configured DNS resolver (set DNS_SERVERS for internal DNS)"
+    fi
+
     mkdir -p "${DNS_OUT_DIR}" "$(dirname "${DC_FILE}")"
     local detail="${DNS_OUT_DIR}/domain_controllers_detail.txt"
     local tmp
@@ -81,21 +98,31 @@ function run_task_03_domain_controllers() {
     local domain host ip
     while IFS= read -r domain; do
         [[ -z "${domain}" ]] && continue
-        LOG info "Querying DC SRV records for: ${domain}"
+        LOG info "Locating DCs for: ${domain} (SRV + apex-A)"
         if internal::is_dry_run; then
-            LOG info "[DRY RUN] would query SRV records for ${domain}"
+            LOG info "[DRY RUN] would query SRV + A records for ${domain}"
             continue
         fi
+
+        # 1. SRV records advertising DCs -> hostname -> A.
         while IFS= read -r host; do
             [[ -z "${host}" ]] && continue
-            printf '%s\t%s\n' "${domain}" "${host}" >> "${detail}"
+            printf '%s\tsrv-host=%s\n' "${domain}" "${host}" >> "${detail}"
             printf '%s\n' "${host}" >> "${tmp}"
             while IFS= read -r ip; do
                 [[ -z "${ip}" ]] && continue
-                printf '%s\thost=%s\tip=%s\n' "${domain}" "${host}" "${ip}" >> "${detail}"
+                printf '%s\tsrv-host=%s\tip=%s\n' "${domain}" "${host}" "${ip}" >> "${detail}"
                 printf '%s\n' "${ip}" >> "${tmp}"
-            done < <(_resolve_a "${host}")
-        done < <(_srv_targets "${domain}" | sort -u)
+            done < <(_resolve_a "${host}" "${server}")
+        done < <(_srv_targets "${domain}" "${server}" | sort -u)
+
+        # 2. "DA" lookup: A record of the domain apex. In AD the domain name
+        #    itself resolves to every DC's IP.
+        while IFS= read -r ip; do
+            [[ -z "${ip}" ]] && continue
+            printf '%s\tapex-A\tip=%s\n' "${domain}" "${ip}" >> "${detail}"
+            printf '%s\n' "${ip}" >> "${tmp}"
+        done < <(_resolve_a "${domain}" "${server}")
     done < <(internal::clean_list "${domains_src}")
 
     sort -u "${tmp}" | grep -vE '^$' > "${DC_FILE}" || true
@@ -106,7 +133,7 @@ function run_task_03_domain_controllers() {
     if ((n > 0)); then
         LOG pass "Domain controllers found: ${n} -> ${DC_FILE}"
     else
-        LOG warn "No domain controllers resolved from SRV records"
+        LOG warn "No domain controllers resolved (SRV or apex-A)"
     fi
     return 0
 }

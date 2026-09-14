@@ -10,6 +10,12 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ### Fixed
 
+- `bash/internal` `03-domain-controllers`: now also performs an apex-A ("DA")
+  lookup of each identified domain (in AD the bare domain name resolves to
+  every DC's IP), in addition to the DC SRV records — and honors `DNS_SERVERS`
+  so SRV/A queries hit the internal DNS/domain controllers rather than the
+  host's default resolver (the same internal-DNS gap fixed in `02-dns-lookup`).
+
 - `bash/internal` `02-dns-lookup`: DNS enumeration now works for CIDR-scoped
   internal engagements. The task rebuilt around `nmap -sL`, which expands
   CIDRs and does the PTR sweep in one pass — the old per-host `dig` loop
