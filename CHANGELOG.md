@@ -10,6 +10,10 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ### Fixed
 
+- `bash/internal` `03-domain-controllers`: reports the number of domain
+  controllers identified per domain (logged per domain and written to
+  `DNS/domain_controllers_by_domain.txt`), alongside the overall total.
+
 - `bash/internal` `03-domain-controllers`: now also performs an apex-A ("DA")
   lookup of each identified domain (in AD the bare domain name resolves to
   every DC's IP), in addition to the DC SRV records — and honors `DNS_SERVERS`

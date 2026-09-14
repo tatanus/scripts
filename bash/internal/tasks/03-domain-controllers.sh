@@ -95,7 +95,10 @@ function run_task_03_domain_controllers() {
     tmp="$(mktemp)"
     : > "${detail}"
 
-    local domain host ip
+    local summary="${DNS_OUT_DIR}/domain_controllers_by_domain.txt"
+    : > "${summary}"
+
+    local domain host ip dom_ips dom_n
     while IFS= read -r domain; do
         [[ -z "${domain}" ]] && continue
         LOG info "Locating DCs for: ${domain} (SRV + apex-A)"
@@ -103,6 +106,9 @@ function run_task_03_domain_controllers() {
             LOG info "[DRY RUN] would query SRV + A records for ${domain}"
             continue
         fi
+
+        # Per-domain set of DC IPs, so we can report a count for each domain.
+        dom_ips="$(mktemp)"
 
         # 1. SRV records advertising DCs -> hostname -> A.
         while IFS= read -r host; do
@@ -113,6 +119,7 @@ function run_task_03_domain_controllers() {
                 [[ -z "${ip}" ]] && continue
                 printf '%s\tsrv-host=%s\tip=%s\n' "${domain}" "${host}" "${ip}" >> "${detail}"
                 printf '%s\n' "${ip}" >> "${tmp}"
+                printf '%s\n' "${ip}" >> "${dom_ips}"
             done < <(_resolve_a "${host}" "${server}")
         done < <(_srv_targets "${domain}" "${server}" | sort -u)
 
@@ -122,7 +129,17 @@ function run_task_03_domain_controllers() {
             [[ -z "${ip}" ]] && continue
             printf '%s\tapex-A\tip=%s\n' "${domain}" "${ip}" >> "${detail}"
             printf '%s\n' "${ip}" >> "${tmp}"
+            printf '%s\n' "${ip}" >> "${dom_ips}"
         done < <(_resolve_a "${domain}" "${server}")
+
+        dom_n="$(sort -u "${dom_ips}" | grep -cvE '^$')"
+        rm -f "${dom_ips}"
+        printf '%s\t%s\n' "${domain}" "${dom_n}" >> "${summary}"
+        if ((dom_n > 0)); then
+            LOG pass "  ${domain}: ${dom_n} domain controller(s)"
+        else
+            LOG warn "  ${domain}: no domain controllers resolved"
+        fi
     done < <(internal::clean_list "${domains_src}")
 
     sort -u "${tmp}" | grep -vE '^$' > "${DC_FILE}" || true
@@ -131,7 +148,8 @@ function run_task_03_domain_controllers() {
     local n
     n="$(wc -l < "${DC_FILE}" | tr -d ' ')"
     if ((n > 0)); then
-        LOG pass "Domain controllers found: ${n} -> ${DC_FILE}"
+        LOG pass "Domain controllers found: ${n} total -> ${DC_FILE}"
+        LOG info "Per-domain counts -> ${summary}"
     else
         LOG warn "No domain controllers resolved (SRV or apex-A)"
     fi
