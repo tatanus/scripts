@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2154
 # Rationale: DOMAINS_FOUND_FILE / DOMAINS_FILE / DNS_OUT_DIR / DC_FILE /
+# DC_IP_LIST_FILE / DC_FQDN_LIST_FILE / DC_LIST_FILE / DC_RAW_FILE /
 # DNS_SERVERS and the LOG / internal::* helpers come from internal_lib.sh.
 
 ###############################################################################
 # TASK: 03-domain-controllers
 # DESCRIPTION: For every domain identified in task 02 (plus any seed
 #              domains.txt), locate the Active Directory domain controllers via
-#              DNS and resolve them to IPs. Writes a de-duplicated list of DC
-#              hostnames/IPs to domain_controllers.txt .
-#
-#              Two complementary DNS methods are used per domain:
-#                1. SRV records that advertise DCs (_ldap._tcp.dc._msdcs, ...).
+#              DNS and resolve them to IPs. Two complementary methods per
+#              domain:
+#                1. SRV records advertising DCs (_ldap._tcp.dc._msdcs, ...).
 #                2. A record of the bare domain apex ("DA" lookup) -- in AD the
 #                   domain name itself resolves to every DC's IP.
 #
-#              Internal PTR/SRV/A records only resolve against the environment's
-#              own DNS (typically the DCs), so queries honor DNS_SERVERS the
-#              same way task 02 does.
+#              Outputs (in WORK_DIR):
+#                DC_IP_LIST.txt    - unique DC IPs
+#                DC_FQDN_LIST.txt  - unique DC FQDNs
+#                DC_LIST.txt       - IP<TAB>FQDN mapping
+#              Raw dig/host/nslookup output is saved to DC_RAW_FILE, and a
+#              per-domain count to domain_controllers_by_domain.txt .
+#
+#              Internal SRV/A/PTR records only resolve against the environment's
+#              own DNS (typically the DCs), so queries honor DNS_SERVERS.
 ###############################################################################
 
 set -uo pipefail
@@ -32,34 +37,72 @@ readonly -a DC_SRV_PREFIXES=(
 )
 
 ###############################################################################
-# _srv_targets <domain> [server]  -> prints SRV target hostnames
+# _append_raw <label> <raw-output>  -> record a query's raw output
+###############################################################################
+function _append_raw() {
+    {
+        printf '===== %s =====\n' "${1}"
+        printf '%s\n\n' "${2}"
+    } >> "${DC_RAW_FILE}"
+}
+
+###############################################################################
+# _srv_targets <domain> <server>  -> prints SRV target hostnames (FQDNs)
+# Logs the raw command output to DC_RAW_FILE.
 ###############################################################################
 function _srv_targets() {
-    local domain="${1}" server="${2:-}" prefix fqdn
+    local domain="${1}" server="${2:-}" prefix fqdn raw
     for prefix in "${DC_SRV_PREFIXES[@]}"; do
         fqdn="${prefix}.${domain}"
         if cmd::exists dig; then
-            # SRV answer: prio weight port target
-            dig +short SRV "${fqdn}" ${server:+@"${server}"} 2> /dev/null | awk '{print $4}' | sed 's/\.$//'
+            raw="$(dig SRV "${fqdn}" ${server:+@"${server}"} 2>&1)"
+            _append_raw "dig SRV ${fqdn}${server:+ @${server}}" "${raw}"
+            printf '%s\n' "${raw}" | awk '$0 !~ /^;/ && $4 == "SRV" {print $NF}' | sed 's/\.$//'
         elif cmd::exists host; then
-            host -t SRV "${fqdn}" ${server:+"${server}"} 2> /dev/null | awk '/SRV record/ {print $NF}' | sed 's/\.$//'
+            raw="$(host -t SRV "${fqdn}" ${server:+"${server}"} 2>&1)"
+            _append_raw "host -t SRV ${fqdn}${server:+ ${server}}" "${raw}"
+            printf '%s\n' "${raw}" | awk '/SRV record/ {print $NF}' | sed 's/\.$//'
         elif cmd::exists nslookup; then
-            nslookup -type=SRV "${fqdn}" ${server:+"${server}"} 2> /dev/null | awk '/service =/ {print $NF}' | sed 's/\.$//'
+            raw="$(nslookup -type=SRV "${fqdn}" ${server:+"${server}"} 2>&1)"
+            _append_raw "nslookup -type=SRV ${fqdn}${server:+ ${server}}" "${raw}"
+            printf '%s\n' "${raw}" | awk '/service =/ {print $NF}' | sed 's/\.$//'
         fi
     done
 }
 
 ###############################################################################
-# _resolve_a <host> [server]  -> prints A record(s)
+# _resolve_a <host> <server>  -> prints A record(s); logs raw output
 ###############################################################################
 function _resolve_a() {
-    local name="${1}" server="${2:-}"
+    local name="${1}" server="${2:-}" raw
     if cmd::exists dig; then
-        dig +short A "${name}" ${server:+@"${server}"} 2> /dev/null
+        raw="$(dig A "${name}" ${server:+@"${server}"} 2>&1)"
+        _append_raw "dig A ${name}${server:+ @${server}}" "${raw}"
+        printf '%s\n' "${raw}" | awk '$0 !~ /^;/ && $4 == "A" {print $5}'
     elif cmd::exists host; then
-        host "${name}" ${server:+"${server}"} 2> /dev/null | awk '/has address/ {print $NF}'
+        raw="$(host "${name}" ${server:+"${server}"} 2>&1)"
+        _append_raw "host ${name}${server:+ ${server}}" "${raw}"
+        printf '%s\n' "${raw}" | awk '/has address/ {print $NF}'
     elif cmd::exists nslookup; then
-        nslookup "${name}" ${server:+"${server}"} 2> /dev/null | awk '/^Address: / {print $2}'
+        raw="$(nslookup "${name}" ${server:+"${server}"} 2>&1)"
+        _append_raw "nslookup ${name}${server:+ ${server}}" "${raw}"
+        printf '%s\n' "${raw}" | awk '/^Address: / {print $2}'
+    fi
+}
+
+###############################################################################
+# _resolve_ptr <ip> <server>  -> prints PTR name (FQDN) for an IP; logs raw
+###############################################################################
+function _resolve_ptr() {
+    local ip="${1}" server="${2:-}" raw
+    if cmd::exists dig; then
+        raw="$(dig +short -x "${ip}" ${server:+@"${server}"} 2>&1)"
+        _append_raw "dig -x ${ip}${server:+ @${server}}" "${raw}"
+        printf '%s\n' "${raw}" | grep -vE '^;|^$' | sed 's/\.$//' | head -n 1
+    elif cmd::exists host; then
+        raw="$(host "${ip}" ${server:+"${server}"} 2>&1)"
+        _append_raw "host ${ip}${server:+ ${server}}" "${raw}"
+        printf '%s\n' "${raw}" | awk '/pointer|name pointer/ {print $NF}' | sed 's/\.$//' | head -n 1
     fi
 }
 
@@ -89,16 +132,16 @@ function run_task_03_domain_controllers() {
         LOG info "Using the host's configured DNS resolver (set DNS_SERVERS for internal DNS)"
     fi
 
-    mkdir -p "${DNS_OUT_DIR}" "$(dirname "${DC_FILE}")"
-    local detail="${DNS_OUT_DIR}/domain_controllers_detail.txt"
-    local tmp
-    tmp="$(mktemp)"
-    : > "${detail}"
-
+    mkdir -p "${DNS_OUT_DIR}" "$(dirname "${DC_LIST_FILE}")"
     local summary="${DNS_OUT_DIR}/domain_controllers_by_domain.txt"
     : > "${summary}"
+    : > "${DC_RAW_FILE}"
 
-    local domain host ip dom_ips dom_n
+    # All discovered IP<TAB>FQDN pairs (FQDN "-" when unknown).
+    local pairs
+    pairs="$(mktemp)"
+
+    local domain host ip fqdn dom_ips dom_n
     while IFS= read -r domain; do
         [[ -z "${domain}" ]] && continue
         LOG info "Locating DCs for: ${domain} (SRV + apex-A)"
@@ -107,28 +150,24 @@ function run_task_03_domain_controllers() {
             continue
         fi
 
-        # Per-domain set of DC IPs, so we can report a count for each domain.
         dom_ips="$(mktemp)"
 
-        # 1. SRV records advertising DCs -> hostname -> A.
+        # 1. SRV records -> DC FQDN -> A record(s).
         while IFS= read -r host; do
             [[ -z "${host}" ]] && continue
-            printf '%s\tsrv-host=%s\n' "${domain}" "${host}" >> "${detail}"
-            printf '%s\n' "${host}" >> "${tmp}"
             while IFS= read -r ip; do
                 [[ -z "${ip}" ]] && continue
-                printf '%s\tsrv-host=%s\tip=%s\n' "${domain}" "${host}" "${ip}" >> "${detail}"
-                printf '%s\n' "${ip}" >> "${tmp}"
+                printf '%s\t%s\n' "${ip}" "${host}" >> "${pairs}"
                 printf '%s\n' "${ip}" >> "${dom_ips}"
             done < <(_resolve_a "${host}" "${server}")
         done < <(_srv_targets "${domain}" "${server}" | sort -u)
 
-        # 2. "DA" lookup: A record of the domain apex. In AD the domain name
-        #    itself resolves to every DC's IP.
+        # 2. "DA" lookup: the domain apex A records ARE the DC IPs. Reverse-
+        #    resolve each to recover the DC FQDN for the mapping.
         while IFS= read -r ip; do
             [[ -z "${ip}" ]] && continue
-            printf '%s\tapex-A\tip=%s\n' "${domain}" "${ip}" >> "${detail}"
-            printf '%s\n' "${ip}" >> "${tmp}"
+            fqdn="$(_resolve_ptr "${ip}" "${server}")"
+            printf '%s\t%s\n' "${ip}" "${fqdn:--}" >> "${pairs}"
             printf '%s\n' "${ip}" >> "${dom_ips}"
         done < <(_resolve_a "${domain}" "${server}")
 
@@ -142,14 +181,21 @@ function run_task_03_domain_controllers() {
         fi
     done < <(internal::clean_list "${domains_src}")
 
-    sort -u "${tmp}" | grep -vE '^$' > "${DC_FILE}" || true
-    rm -f "${tmp}"
+    # Build the three output files from the collected pairs.
+    sort -u "${pairs}" | grep -vE '^[[:space:]]*$' > "${DC_LIST_FILE}" || true
+    cut -f1 "${DC_LIST_FILE}" | grep -vE '^$' | sort -u > "${DC_IP_LIST_FILE}" || true
+    cut -f2 "${DC_LIST_FILE}" | grep -vE '^-?$' | sort -u > "${DC_FQDN_LIST_FILE}" || true
+    cp -f "${DC_LIST_FILE}" "${DC_FILE}" 2> /dev/null || true # backward compat
+    rm -f "${pairs}"
 
-    local n
-    n="$(wc -l < "${DC_FILE}" | tr -d ' ')"
-    if ((n > 0)); then
-        LOG pass "Domain controllers found: ${n} total -> ${DC_FILE}"
-        LOG info "Per-domain counts -> ${summary}"
+    local ipn fqn
+    ipn="$(wc -l < "${DC_IP_LIST_FILE}" | tr -d ' ')"
+    fqn="$(wc -l < "${DC_FQDN_LIST_FILE}" | tr -d ' ')"
+    if ((ipn > 0 || fqn > 0)); then
+        LOG pass "DC IPs:   ${ipn} -> ${DC_IP_LIST_FILE}"
+        LOG pass "DC FQDNs: ${fqn} -> ${DC_FQDN_LIST_FILE}"
+        LOG pass "DC map:   ${DC_LIST_FILE} (IP -> FQDN)"
+        LOG info "Raw queries -> ${DC_RAW_FILE}; per-domain counts -> ${summary}"
     else
         LOG warn "No domain controllers resolved (SRV or apex-A)"
     fi

@@ -10,6 +10,12 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ### Fixed
 
+- `bash/internal` `03-domain-controllers`: now writes three DC output files in
+  `WORK_DIR` — `DC_IP_LIST.txt` (unique IPs), `DC_FQDN_LIST.txt` (unique
+  FQDNs), and `DC_LIST.txt` (the `IP<TAB>FQDN` mapping; apex-A IPs are
+  reverse-resolved to recover their FQDN). The raw `dig`/`host`/`nslookup`
+  output of every query is saved to `DNS/dc_raw_queries.txt`.
+
 - `bash/internal` `03-domain-controllers`: reports the number of domain
   controllers identified per domain (logged per domain and written to
   `DNS/domain_controllers_by_domain.txt`), alongside the overall total.

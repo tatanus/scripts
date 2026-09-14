@@ -172,6 +172,12 @@ export WEB_IPPORTS_FILE="${WEB_IPPORTS_FILE:-${WORK_DIR}/web_ipports.txt}"
 export WEB_URLS_FILE="${WEB_URLS_FILE:-${WORK_DIR}/web_urls.txt}"
 export DOMAINS_FOUND_FILE="${DOMAINS_FOUND_FILE:-${WORK_DIR}/domains_found.txt}"
 export DC_FILE="${DC_FILE:-${WORK_DIR}/domain_controllers.txt}"
+# Domain-controller lists produced by 03-domain-controllers.
+export DC_IP_LIST_FILE="${DC_IP_LIST_FILE:-${WORK_DIR}/DC_IP_LIST.txt}"
+export DC_FQDN_LIST_FILE="${DC_FQDN_LIST_FILE:-${WORK_DIR}/DC_FQDN_LIST.txt}"
+export DC_LIST_FILE="${DC_LIST_FILE:-${WORK_DIR}/DC_LIST.txt}"
+# Raw DNS query output (dig/host/nslookup) for the DC-discovery task.
+export DC_RAW_FILE="${DC_RAW_FILE:-${DNS_OUT_DIR}/dc_raw_queries.txt}"
 
 # Tunables (overridable via config file / environment).
 export MSF_THREADS="${MSF_THREADS:-10}"
