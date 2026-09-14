@@ -20,7 +20,7 @@ bash/internal/
 └── tasks/
     ├── 00-validate.sh         # verify (or prompt for) targets.txt; make dirs
     ├── 01-excludes.sh         # iptables DROP for excludes.txt (own chain)
-    ├── 02-dns-lookup.sh       # PTR/A lookups; harvest domains
+    ├── 02-dns-lookup.sh       # nmap -sL PTR sweep (expands CIDRs); harvest domains
     ├── 03-domain-controllers.sh # AD DC SRV lookups per domain
     ├── 04-spoonmap.sh         # TrustedSec spoonmap scan -> hosts/ip:ports
     ├── 05-msf-import.sh        # db_import scan XML into Metasploit
@@ -89,7 +89,10 @@ TASK_REQUIRED["04-spoonmap"]=true
   minimal built-ins if absent).
 - Tools installed by **pentest_setup**: `spoonmap.py`, `msfconsole`
   (+ initialised `msfdb`), the `SCRIPTS/MSF/` resource scripts, `gowitness`,
-  `httpx`, `nuclei`, `nxc`, and a DNS resolver (`dig`/`host`/`nslookup`).
+  `httpx`, `nuclei`, `nxc`, `nmap` (used by `02-dns-lookup` for the `-sL` PTR
+  sweep, which expands CIDRs; `dig`/`host`/`nslookup` are the no-nmap
+  fallback). For internal PTR records, set `DNS_SERVERS` to the internal DNS /
+  domain controllers unless this host already resolves via them.
 
 Missing *required* tools abort a task; missing *optional* tools (gowitness,
 httpx, nuclei) are logged and skipped so the rest of the run proceeds.

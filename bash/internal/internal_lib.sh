@@ -158,6 +158,13 @@ export TARGETS_FILE="${TARGETS_FILE:-${RECON_DIR}/targets.txt}"
 export EXCLUDES_FILE="${EXCLUDES_FILE:-${RECON_DIR}/excludes.txt}"
 export DOMAINS_FILE="${DOMAINS_FILE:-${RECON_DIR}/domains.txt}"
 
+# Internal DNS server(s) for reverse/forward resolution (comma-separated).
+# Internal PTR records only resolve against the environment's own DNS (usually
+# the domain controllers), not whatever public resolver the host defaults to.
+# Empty = use the host's configured resolver (correct when the box already
+# points at internal DNS). Example: DNS_SERVERS="10.0.0.10,10.0.0.11"
+export DNS_SERVERS="${DNS_SERVERS:-}"
+
 # Shared work files produced by one task and consumed by later ones.
 export LIVE_HOSTS_FILE="${LIVE_HOSTS_FILE:-${WORK_DIR}/hosts.txt}"
 export IPPORTS_FILE="${IPPORTS_FILE:-${WORK_DIR}/ipports.txt}"

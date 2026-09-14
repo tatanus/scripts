@@ -10,6 +10,15 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ### Fixed
 
+- `bash/internal` `02-dns-lookup`: DNS enumeration now works for CIDR-scoped
+  internal engagements. The task rebuilt around `nmap -sL`, which expands
+  CIDRs and does the PTR sweep in one pass — the old per-host `dig` loop
+  skipped every `*/*` (CIDR) entry, so a subnet-scoped scope resolved nothing.
+  Added a `DNS_SERVERS` knob so the sweep queries the internal DNS / domain
+  controllers (`nmap --dns-servers`); PTR of internal IPs against a public
+  resolver returns nothing. `dig`/`host`/`nslookup` remain the no-nmap
+  fallback (bare IPs/hostnames only).
+
 - `bash/recon`: phase `00-validate` no longer crashes with `line 60: 2:
   unbound variable` under `set -u`. `scope_expand`'s space-separated counts
   were not split because the suite runs under `IFS=$'\n\t'`; a local `IFS`
