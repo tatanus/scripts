@@ -91,7 +91,7 @@ TASK_REQUIRED["04-spoonmap"]=true
   (+ initialised `msfdb`), the `SCRIPTS/MSF/` resource scripts, `gowitness`,
   `httpx`, `nuclei`, `nxc`, `nmap` (used by `02-dns-lookup` for the `-sL` PTR
   sweep, which expands CIDRs; `dig`/`host`/`nslookup` are the no-nmap
-  fallback). For internal PTR records, set `DNS_SERVERS` to the internal DNS /
+  fallback). For internal PTR records, set `DNS_SERVER` to the internal DNS /
   domain controllers unless this host already resolves via them.
 
 Missing *required* tools abort a task; missing *optional* tools (gowitness,

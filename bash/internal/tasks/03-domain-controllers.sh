@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2154
 # Rationale: DOMAINS_FOUND_FILE / DOMAINS_FILE / DNS_OUT_DIR / DC_FILE /
-# DC_IP_LIST_FILE / DC_FQDN_LIST_FILE / DC_LIST_FILE / DC_RAW_FILE /
-# DNS_SERVERS and the LOG / internal::* helpers come from internal_lib.sh.
+# DC_IP_FILE / DC_FQDN_FILE / DC_LIST_FILE / DC_RAW_FILE /
+# DNS_SERVER and the LOG / internal::* helpers come from internal_lib.sh.
 
 ###############################################################################
 # TASK: 03-domain-controllers
@@ -22,7 +22,7 @@
 #              per-domain count to domain_controllers_by_domain.txt .
 #
 #              Internal SRV/A/PTR records only resolve against the environment's
-#              own DNS (typically the DCs), so queries honor DNS_SERVERS.
+#              own DNS (typically the DCs), so queries honor DNS_SERVER.
 ###############################################################################
 
 set -uo pipefail
@@ -124,12 +124,12 @@ function run_task_03_domain_controllers() {
         return 0
     fi
 
-    # dig/host/nslookup take a single server; use the first of DNS_SERVERS.
-    local server="${DNS_SERVERS%%,*}"
+    # dig/host/nslookup take a single server; use the first of DNS_SERVER.
+    local server="${DNS_SERVER%%,*}"
     if [[ -n "${server}" ]]; then
         LOG info "Querying internal DNS server: ${server}"
     else
-        LOG info "Using the host's configured DNS resolver (set DNS_SERVERS for internal DNS)"
+        LOG info "Using the host's configured DNS resolver (set DNS_SERVER for internal DNS)"
     fi
 
     mkdir -p "${DNS_OUT_DIR}" "$(dirname "${DC_LIST_FILE}")"
@@ -183,17 +183,17 @@ function run_task_03_domain_controllers() {
 
     # Build the three output files from the collected pairs.
     sort -u "${pairs}" | grep -vE '^[[:space:]]*$' > "${DC_LIST_FILE}" || true
-    cut -f1 "${DC_LIST_FILE}" | grep -vE '^$' | sort -u > "${DC_IP_LIST_FILE}" || true
-    cut -f2 "${DC_LIST_FILE}" | grep -vE '^-?$' | sort -u > "${DC_FQDN_LIST_FILE}" || true
+    cut -f1 "${DC_LIST_FILE}" | grep -vE '^$' | sort -u > "${DC_IP_FILE}" || true
+    cut -f2 "${DC_LIST_FILE}" | grep -vE '^-?$' | sort -u > "${DC_FQDN_FILE}" || true
     cp -f "${DC_LIST_FILE}" "${DC_FILE}" 2> /dev/null || true # backward compat
     rm -f "${pairs}"
 
     local ipn fqn
-    ipn="$(wc -l < "${DC_IP_LIST_FILE}" | tr -d ' ')"
-    fqn="$(wc -l < "${DC_FQDN_LIST_FILE}" | tr -d ' ')"
+    ipn="$(wc -l < "${DC_IP_FILE}" | tr -d ' ')"
+    fqn="$(wc -l < "${DC_FQDN_FILE}" | tr -d ' ')"
     if ((ipn > 0 || fqn > 0)); then
-        LOG pass "DC IPs:   ${ipn} -> ${DC_IP_LIST_FILE}"
-        LOG pass "DC FQDNs: ${fqn} -> ${DC_FQDN_LIST_FILE}"
+        LOG pass "DC IPs:   ${ipn} -> ${DC_IP_FILE}"
+        LOG pass "DC FQDNs: ${fqn} -> ${DC_FQDN_FILE}"
         LOG pass "DC map:   ${DC_LIST_FILE} (IP -> FQDN)"
         LOG info "Raw queries -> ${DC_RAW_FILE}; per-domain counts -> ${summary}"
     else

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2154
 # Rationale: TARGETS_FILE / DOMAINS_FILE / DNS_OUT_DIR / DOMAINS_FOUND_FILE /
-# DNS_SERVERS and the LOG / internal::* helpers come from internal_lib.sh.
+# DNS_SERVER and the LOG / internal::* helpers come from internal_lib.sh.
 
 ###############################################################################
 # TASK: 02-dns-lookup
@@ -17,7 +17,7 @@
 #
 #              Because this is INTERNAL recon, PTR records only resolve against
 #              the environment's own DNS (typically the domain controllers).
-#              Set DNS_SERVERS to point nmap at them; otherwise the host's
+#              Set DNS_SERVER to point nmap at them; otherwise the host's
 #              configured resolver is used (correct when the box already points
 #              at internal DNS).
 ###############################################################################
@@ -74,12 +74,12 @@ function _dns_via_nmap() {
     local nmap_out="${DNS_OUT_DIR}/nmap_sl.txt"
 
     local -a nmap_args=(-sL -R)
-    [[ -n "${DNS_SERVERS:-}" ]] && nmap_args+=(--dns-servers "${DNS_SERVERS}")
+    [[ -n "${DNS_SERVER:-}" ]] && nmap_args+=(--dns-servers "${DNS_SERVER}")
     nmap_args+=(-iL "${TARGETS_FILE}" -oN "${nmap_out}")
 
     # nmap also prints to stdout; -oN captures the parseable copy, so discard
     # stdout (logging still goes to stderr).
-    internal::run "nmap -sL reverse-DNS sweep${DNS_SERVERS:+ via ${DNS_SERVERS}}" \
+    internal::run "nmap -sL reverse-DNS sweep${DNS_SERVER:+ via ${DNS_SERVER}}" \
         nmap "${nmap_args[@]}" > /dev/null || return 1
     internal::is_dry_run && return 0
 
@@ -106,7 +106,7 @@ function _dns_via_nmap() {
 ###############################################################################
 function _dns_via_resolver() {
     local reverse_out="${1}" forward_out="${2}" domains_out="${3}"
-    local resolver first_server="${DNS_SERVERS%%,*}"
+    local resolver first_server="${DNS_SERVER%%,*}"
     resolver="$(_resolver)"
     if [[ -z "${resolver}" ]]; then
         LOG error "No DNS resolver found (need nmap, dig, host, or nslookup)"
@@ -158,10 +158,10 @@ function run_task_02_dns_lookup() {
     : > "${reverse_out}"
     : > "${forward_out}"
 
-    if [[ -n "${DNS_SERVERS:-}" ]]; then
-        LOG info "Querying internal DNS server(s): ${DNS_SERVERS}"
+    if [[ -n "${DNS_SERVER:-}" ]]; then
+        LOG info "Querying internal DNS server(s): ${DNS_SERVER}"
     else
-        LOG info "Using the host's configured DNS resolver (set DNS_SERVERS for internal DNS)"
+        LOG info "Using the host's configured DNS resolver (set DNS_SERVER for internal DNS)"
     fi
 
     # Collect discovered parent domains from whichever path runs.

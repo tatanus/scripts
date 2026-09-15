@@ -58,6 +58,20 @@ if [[ -f "${INTERNAL_COMMON_CORE_UTIL}" ]]; then
     source "${INTERNAL_COMMON_CORE_UTIL}"
 fi
 
+# Load the unified stack env (single source of truth) when deployed, so this
+# suite shares DATA_DIR / RECON_DIR / DC_*_FILE / DNS_SERVER, etc. with the rest
+# of the stack. The ${VAR:-default} definitions below then act only as a
+# standalone fallback when the env file is absent.
+_internal_env_file="${PENTEST_ENV_FILE:-${HOME}/.config/bash/pentest.env.sh}"
+if declare -F env::file > /dev/null 2>&1; then
+    _internal_env_file="$(env::file)"
+fi
+if [[ -r "${_internal_env_file}" ]]; then
+    # shellcheck source=/dev/null
+    source "${_internal_env_file}"
+fi
+unset _internal_env_file
+
 # Minimal fallbacks (only defined if common_core did not provide them).
 if ! declare -F info > /dev/null 2>&1; then
     function info() { printf '[* INFO  ] %s\n' "$*" >&2; }
@@ -162,8 +176,8 @@ export DOMAINS_FILE="${DOMAINS_FILE:-${RECON_DIR}/domains.txt}"
 # Internal PTR records only resolve against the environment's own DNS (usually
 # the domain controllers), not whatever public resolver the host defaults to.
 # Empty = use the host's configured resolver (correct when the box already
-# points at internal DNS). Example: DNS_SERVERS="10.0.0.10,10.0.0.11"
-export DNS_SERVERS="${DNS_SERVERS:-}"
+# points at internal DNS). Example: DNS_SERVER="10.0.0.10,10.0.0.11"
+export DNS_SERVER="${DNS_SERVER:-}"
 
 # Shared work files produced by one task and consumed by later ones.
 export LIVE_HOSTS_FILE="${LIVE_HOSTS_FILE:-${WORK_DIR}/hosts.txt}"
@@ -173,9 +187,9 @@ export WEB_URLS_FILE="${WEB_URLS_FILE:-${WORK_DIR}/web_urls.txt}"
 export DOMAINS_FOUND_FILE="${DOMAINS_FOUND_FILE:-${WORK_DIR}/domains_found.txt}"
 export DC_FILE="${DC_FILE:-${WORK_DIR}/domain_controllers.txt}"
 # Domain-controller lists produced by 03-domain-controllers.
-export DC_IP_LIST_FILE="${DC_IP_LIST_FILE:-${WORK_DIR}/DC_IP_LIST.txt}"
-export DC_FQDN_LIST_FILE="${DC_FQDN_LIST_FILE:-${WORK_DIR}/DC_FQDN_LIST.txt}"
-export DC_LIST_FILE="${DC_LIST_FILE:-${WORK_DIR}/DC_LIST.txt}"
+export DC_IP_FILE="${DC_IP_FILE:-${RECON_DIR}/DC_IP.txt}"
+export DC_FQDN_FILE="${DC_FQDN_FILE:-${RECON_DIR}/DC_FQDN.txt}"
+export DC_LIST_FILE="${DC_LIST_FILE:-${RECON_DIR}/DC_LIST.txt}"
 # Raw DNS query output (dig/host/nslookup) for the DC-discovery task.
 export DC_RAW_FILE="${DC_RAW_FILE:-${DNS_OUT_DIR}/dc_raw_queries.txt}"
 

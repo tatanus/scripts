@@ -8,6 +8,16 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+### Changed
+
+- `bash/internal` now shares the stack's unified env: `internal_lib.sh` sources
+  the deployed `pentest.env.sh` when present, and its variable names were
+  aligned to the engagement contract — `DNS_SERVERS`->`DNS_SERVER`,
+  `DC_IP_LIST_FILE`->`DC_IP_FILE`, `DC_FQDN_LIST_FILE`->`DC_FQDN_FILE` (across
+  `internal_lib.sh` and tasks `02-dns-lookup`/`03-domain-controllers`), DC
+  output files defaulting under `RECON/`. Standalone `${VAR:-default}` fallbacks
+  are retained for use without the env file.
+
 ### Fixed
 
 - `bash/internal` `03-domain-controllers`: now writes three DC output files in
