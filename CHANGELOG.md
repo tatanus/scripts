@@ -8,6 +8,9 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+## [2026.09.16.0] - 2026-09-16
+
+
 ### Changed
 
 - `bash/internal` now shares the stack's unified env: `internal_lib.sh` sources
