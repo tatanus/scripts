@@ -68,3 +68,6 @@ build/
 
 .state/
 outputs/
+
+# WIP recon rewrite (staged scanning engine; not yet gate-clean, kept local)
+bash/recon_new.sh

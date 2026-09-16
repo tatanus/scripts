@@ -8,6 +8,26 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+## [2026.09.16.2] - 2026-09-16
+
+
+### Removed
+
+- `bash/recon_new.sh` is no longer tracked (now gitignored). It is a
+  work-in-progress rewrite that does not yet pass the format/lint gates; it had
+  been committed inadvertently. Its staged scanning engine is already merged
+  into `bash/recon/`, so nothing depends on it, and it remains on disk as a
+  local archive.
+
+### Fixed
+
+- Lifecycle tests are now hermetic w.r.t. `DATA_DIR`. Since `install.sh`'s
+  `TARGET_ROOT` honors `DATA_DIR`, an ambient `DATA_DIR` in the caller's shell
+  sent the deploy outside the sandbox HOME and failed the `${HOME}/DATA/...`
+  assertions. The test harness now pins `DATA_DIR="${HOME}/DATA"` in
+  `setup_temp_home` (and unsets it on teardown), which also exercises the
+  `DATA_DIR` code path.
+
 ## [2026.09.16.1] - 2026-09-16
 
 

@@ -29,10 +29,16 @@ export COMMON_CORE_SRC
 function setup_temp_home() {
   export TEST_HOME="$(mktemp -d "/tmp/scripts-test.XXXXXX")"
   export HOME="${TEST_HOME}"
+  # install.sh's TARGET_ROOT is ${DATA_DIR:-${HOME}/DATA}/TOOLS/SCRIPTS. Pin
+  # DATA_DIR to the sandbox HOME so an ambient DATA_DIR from the caller's shell
+  # cannot send the deploy outside the sandbox (which is what the ${HOME}/DATA
+  # assertions below expect); this also exercises the DATA_DIR code path.
+  export DATA_DIR="${HOME}/DATA"
 }
 
 function teardown_temp_home() {
   rm -rf "${TEST_HOME}"
+  unset DATA_DIR
 }
 
 # Install a real common_core into the sandbox HOME (the install.sh
