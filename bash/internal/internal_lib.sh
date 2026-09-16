@@ -167,7 +167,7 @@ fi
 export MSF_SCRIPTS_DIR
 export SPOONMAP_DIR="${SPOONMAP_DIR:-${TOOLS_DIR}/spoonmap}"
 
-# Input files (defaults follow the spec: /root/DATA/RECON/*.txt).
+# Input files (defaults follow the spec: ${HOME}/DATA/RECON/*.txt).
 export TARGETS_FILE="${TARGETS_FILE:-${RECON_DIR}/targets.txt}"
 export EXCLUDES_FILE="${EXCLUDES_FILE:-${RECON_DIR}/excludes.txt}"
 export DOMAINS_FILE="${DOMAINS_FILE:-${RECON_DIR}/domains.txt}"

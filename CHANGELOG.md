@@ -8,6 +8,24 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+## [2026.09.16.1] - 2026-09-16
+
+
+### Changed
+
+- `install.sh` now honors `DATA_DIR`: `TARGET_ROOT` is
+  `${DATA_DIR:-${HOME}/DATA}/TOOLS/SCRIPTS` (was a hardcoded `${HOME}/DATA/...`).
+  This keeps the deploy under the same tree the internal/recon suites read from
+  (`internal_lib.sh` derives `SCRIPTS_DIR` from `${DATA_DIR}`) when the stack is
+  relocated; the default is unchanged since `DATA_DIR` is unset at this stage.
+- Doc/comment paths that read `/root/DATA/...` now read `${HOME}/DATA/...`
+  (internal_lib.sh, run_internal_pentest.sh, bash/internal/README.md) so they
+  are correct for non-root runs. The one intentional exception is
+  `08-msf-modules.sh`'s `MSF_HARDCODED_RUNNER` -- that literal `/root/DATA/...`
+  string is the path baked into pentest_setup's shipped `.rc` files, which the
+  task sed-rewrites to the real `MSF_SCRIPTS_DIR` at runtime, so it must match
+  the shipped content and stays as-is.
+
 ## [2026.09.16.0] - 2026-09-16
 
 

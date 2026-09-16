@@ -2,7 +2,7 @@
 
 A modular, task-based orchestrator for an internal network penetration test.
 It chains reconnaissance, port scanning, Metasploit import/modules, web triage
-and NetExec against the targets described under `/root/DATA/RECON/`.
+and NetExec against the targets described under `${HOME}/DATA/RECON/`.
 
 It reuses tooling installed by **pentest_setup** (spoonmap, the MSF resource
 scripts under `SCRIPTS/MSF/`, netexec) and follows the same `DATA/` directory
@@ -36,11 +36,11 @@ bash/internal/
 
 | File                         | Purpose                                  |
 |------------------------------|------------------------------------------|
-| `/root/DATA/RECON/targets.txt`  | IPs / CIDRs / hostnames to test (required) |
-| `/root/DATA/RECON/excludes.txt` | IPs / CIDRs to iptables-block (optional)   |
-| `/root/DATA/RECON/domains.txt`  | Seed AD domains (optional)                 |
+| `${HOME}/DATA/RECON/targets.txt`  | IPs / CIDRs / hostnames to test (required) |
+| `${HOME}/DATA/RECON/excludes.txt` | IPs / CIDRs to iptables-block (optional)   |
+| `${HOME}/DATA/RECON/domains.txt`  | Seed AD domains (optional)                 |
 
-Outputs land under `/root/DATA/OUTPUT/` (`TEE/`, `PORTSCAN/SPOONMAP/`, `DNS/`,
+Outputs land under `${HOME}/DATA/OUTPUT/` (`TEE/`, `PORTSCAN/SPOONMAP/`, `DNS/`,
 `WEB/`, `GOWITNESS/`, `MSF/`, and the work files in `INTERNAL/`).
 
 ## Usage

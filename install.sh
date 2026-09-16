@@ -2,7 +2,7 @@
 ###############################################################################
 # NAME         : install.sh
 # DESCRIPTION  : Deploy the bash/ and python/ subtrees of this repo into
-#                ${HOME}/DATA/TOOLS/SCRIPTS/{bash,python}/. install / update /
+#                ${DATA_DIR:-${HOME}/DATA}/TOOLS/SCRIPTS/{bash,python}/. install / update /
 #                uninstall flow modelled on bash_setup's installer. Assumes
 #                common_core and bash_setup are already installed; preflight
 #                refuses to run otherwise.
@@ -80,7 +80,12 @@ readonly VERSION
 readonly COMMON_CORE_DIR="${HOME}/.config/bash/lib/common_core"
 readonly COMMON_CORE_UTIL="${COMMON_CORE_DIR}/util.sh"
 readonly BASH_RC="${HOME}/.bashrc"
-readonly TARGET_ROOT="${HOME}/DATA/TOOLS/SCRIPTS"
+# Honor DATA_DIR (the stack-wide relocation knob) so this deploy lands under
+# the same tree the internal/recon suites read from (internal_lib.sh derives
+# SCRIPTS_DIR from ${DATA_DIR}). Defaults to ${HOME}/DATA when DATA_DIR is
+# unset -- which it is when this installer runs before pentest_setup's
+# pentest.env.sh is deployed, so the default matches the historical path.
+readonly TARGET_ROOT="${DATA_DIR:-${HOME}/DATA}/TOOLS/SCRIPTS"
 # Marker written on a successful install; its presence (and contents) let a
 # later run detect a prior install and prompt before overwriting.
 readonly SCRIPTS_VERSION_FILE="${TARGET_ROOT}/VERSION"
