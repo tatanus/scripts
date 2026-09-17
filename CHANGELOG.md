@@ -8,6 +8,16 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+## [2026.09.17.1] - 2026-09-17
+
+### Added
+- `bash/lib/m365.sh`: shared Microsoft 365 / Entra OSINT library (`m365::`
+  namespace) — tenant discovery, user-realm/MFA info, autodiscover + federation
+  metadata, SaaS-service detection, and domain correlation. Sourceable by any
+  pentest tool as `${SCRIPTS_DIR}/bash/lib/m365.sh`. Generic DNS lookups
+  delegate to common_core's `dns::` helpers (util_dns.sh) instead of
+  re-implementing them.
+
 ## [2026.09.17.0] - 2026-09-17
 
 
