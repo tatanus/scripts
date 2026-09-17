@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034,SC2154
 # Rationale:
-# - SC2154: CURL_UA comes from web_utils.sh (sourced via m365_recon_NG.sh)
+# - SC2154: CURL_UA comes from core.sh (sourced at the top of this module).
 #   and TARGETS_FILE from run_recon.sh; ShellCheck cannot follow that chain.
 # - SC2034: local helper-capture vars (r, r2, ua, results) are kept for
 #   readability / future use during the iterative refactor of this module.
@@ -24,12 +24,8 @@ IFS=$'\n\t'
 
 # Module dependencies (adjust as needed)
 script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
-source "${script_dir}/common_utils.sh"
-source "${script_dir}/dns_utils.sh" 2> /dev/null || true
-source "${script_dir}/smtp_utils.sh" 2> /dev/null || true
-source "${script_dir}/web_utils.sh" 2> /dev/null || true
-source "${script_dir}/cloud_surface_utils.sh" 2> /dev/null || true
-source "${script_dir}/json_utils.sh" 2> /dev/null || true
+# shellcheck source=./core.sh
+source "${script_dir}/core.sh"
 
 #==============================================================================
 # SharePoint / Teams / B2C / SAML

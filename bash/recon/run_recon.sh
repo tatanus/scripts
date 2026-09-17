@@ -74,14 +74,17 @@ RECON_NUCLEI_TEMPLATES_DEFAULT="${RECON_NUCLEI_TEMPLATES_DEFAULT:-${RECON_NUCLEI
 #===============================================================================
 COMMON_CORE_LIB="${COMMON_CORE_LIB:-${HOME}/.config/bash/lib/common_core}"
 
-# common_core logger (preferred), then recon-suite common_utils fallback.
+# common_core is a hard dependency (Bash 4+): it provides logging
+# (info/warn/error/pass/debug/fail), cmd::exists, dns::, net::, and
+# platform::timeout used throughout the suite and its m365 library.
 if [[ -f "${COMMON_CORE_LIB}/util.sh" ]]; then
     # shellcheck source=/dev/null
-    source "${COMMON_CORE_LIB}/util.sh" 2> /dev/null || true
+    source "${COMMON_CORE_LIB}/util.sh"
 fi
-if [[ -f "${RECON_MODULE_DIR}/common_utils.sh" ]]; then
-    # shellcheck source=/dev/null
-    source "${RECON_MODULE_DIR}/common_utils.sh" 2> /dev/null || true
+if ! declare -F cmd::exists > /dev/null 2>&1; then
+    printf '[ERROR] common_core not found (set COMMON_CORE_LIB or install it at %s)\n' \
+        "${HOME}/.config/bash/lib/common_core" >&2
+    exit 1
 fi
 
 # shellcheck source=lib/recon_lib.sh

@@ -18,12 +18,8 @@ IFS=$'\n\t'
 
 # Module dependencies (adjust as needed)
 script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
-source "${script_dir}/common_utils.sh"
-source "${script_dir}/dns_utils.sh" 2> /dev/null || true
-source "${script_dir}/smtp_utils.sh" 2> /dev/null || true
-source "${script_dir}/web_utils.sh" 2> /dev/null || true
-source "${script_dir}/cloud_surface_utils.sh" 2> /dev/null || true
-source "${script_dir}/json_utils.sh" 2> /dev/null || true
+# shellcheck source=./core.sh
+source "${script_dir}/core.sh"
 
 #==============================================================================
 # SMTP Probing

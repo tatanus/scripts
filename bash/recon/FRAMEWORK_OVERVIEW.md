@@ -32,15 +32,28 @@ recon/
 │   └── 07-report.sh           # aggregate JSON/summary (+ analysis_and_output.sh)
 ├── config/                    # unified-{quick,default,aggressive}.conf
 ├── examples/                  # targets.txt.example, domains.txt.example
-│
-│  # Shared intel/util modules (used by phases 02/03/07 via m365_recon_NG.sh):
-├── common_utils.sh  dns_utils.sh  smtp_utils.sh  web_utils.sh
-├── cloud_surface_utils.sh  json_utils.sh
-├── dns_email_recon.sh  entra_azure_recon.sh  m365_recon_NG.sh
-├── services_recon.sh  smtp_recon.sh  osint.sh  msgraph_recon.sh
-├── analysis_and_output.sh
+├── m365_recon_NG.sh           # thin CLI launcher -> ../lib/m365.sh
 └── setup_engagement.sh        # engagement-directory scaffolding helper
+
+../lib/m365/                   # canonical M365/Entra/Azure library (see below)
+├── m365.sh  (../lib/)         # aggregator + CLI (usage/main) + m365::analyze
+└── m365/
+    ├── core.sh                # common_core bridge + shims (have_cmd, die,
+    │                          #   run_with_timeout, dns_query_generic, ...)
+    │                          #   + JSON/HTTP/SMTP/cloud util helpers
+    ├── dns_email_recon.sh  entra_azure_recon.sh  msgraph_recon.sh
+    ├── services_recon.sh   smtp_recon.sh   osint.sh
+    └── analysis_and_output.sh
 ```
+
+The M365 intel modules were moved out of `recon/` into the shared library
+`../lib/m365/` so both this suite (phases 02/03/07, via `m365_recon_NG.sh`) and
+pentest_menu consume one implementation. The old per-suite `common_utils.sh`
+and `dns_utils.sh` (plus the json/web/smtp/cloud util files) were removed:
+the suite now **hard-depends on common_core** (Bash 4+) for logging
+(`info/warn/error/pass/debug/fail`), `cmd::exists`, `dns::`, `net::` and
+`platform::timeout`, with `lib/m365/core.sh` providing the small M365-specific
+helpers common_core does not ship.
 
 ## Phase workflow
 

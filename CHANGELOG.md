@@ -8,6 +8,31 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+## [2026.09.17.2] - 2026-09-17
+
+### Changed
+- **Recon suite now hard-depends on common_core (Bash 4+)** and the M365 logic
+  is consolidated into one canonical library. `bash/lib/m365.sh` was rebuilt
+  from the suite's richer implementation (it previously held a junior copy
+  extracted from pentest_menu): it aggregates a new `bash/lib/m365/` package —
+  `core.sh` (common_core bridge + `have_cmd`/`run_with_timeout`/`die`/
+  `dns_query_generic`/… shims + JSON/HTTP/SMTP/cloud helpers) plus the relocated
+  `dns_email_recon.sh`, `entra_azure_recon.sh`, `msgraph_recon.sh`,
+  `services_recon.sh`, `smtp_recon.sh`, `osint.sh`, `analysis_and_output.sh` —
+  and exposes `main`/`usage` and an `m365::analyze <domain> [json_out]` entry.
+- `bash/recon/m365_recon_NG.sh` reduced to a thin launcher that sources
+  `../lib/m365.sh`. `run_recon.sh` now requires common_core (was an optional
+  logger bridge with a `common_utils.sh` fallback); `lib/recon_lib.sh`'s
+  `have_cmd` delegates to `cmd::exists`; `phases/07-report.sh` points at the
+  relocated `analysis_and_output.sh`.
+
+### Removed
+- `bash/recon/{common_utils.sh,dns_utils.sh,smtp_utils.sh,web_utils.sh,
+  json_utils.sh,cloud_surface_utils.sh}` — their logging/color/`have_cmd`/DNS
+  reimplementations are replaced by common_core, and their M365-specific helpers
+  fold into `bash/lib/m365/core.sh`. Also fixes a latent bug: `die` was called
+  on error paths but defined nowhere; it is now provided by `core.sh`.
+
 ## [2026.09.17.1] - 2026-09-17
 
 ### Added

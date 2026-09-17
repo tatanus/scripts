@@ -98,8 +98,11 @@ cat urls.txt | httpx -silent | nuclei -ni -o nuclei.out -t dns -t headless \
 
 ## Notes / follow-ups
 
-- Phases 02/03 delegate to `m365_recon_NG.sh`; phase 07 can call
-  `analysis_and_output.sh`. Those modules are used as-is (already compliant).
+- Phases 02/03 delegate to `m365_recon_NG.sh`, now a thin launcher for the
+  canonical M365 library at `../lib/m365.sh`; phase 07 calls
+  `../lib/m365/analysis_and_output.sh`. The suite hard-depends on common_core
+  (Bash 4+); the old `common_utils.sh`/`dns_utils.sh` were removed in favor of
+  common_core + `lib/m365/core.sh`.
 - The discovery normalizer uses a compact public-suffix heuristic; the
   `recon_new.sh` original had a fuller PSL-aware reducer if deeper accuracy is
   needed later.

@@ -93,11 +93,13 @@ if [[ -z "${RECON_LIB_LOADED:-}" ]]; then
 
     ###########################################################################
     # have_cmd
-    # Purpose : Test whether a command is available on PATH.
+    # Purpose : Test whether a command is available on PATH. Delegates to
+    #           common_core's cmd::exists (hard dependency) so there is one
+    #           implementation; kept as an alias for the suite's call sites.
     # Args    : $1 - command name
     ###########################################################################
     function have_cmd() {
-        command -v "${1}" > /dev/null 2>&1
+        cmd::exists "${1}"
     }
 
     ###########################################################################

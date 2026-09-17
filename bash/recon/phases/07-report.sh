@@ -64,7 +64,8 @@ function run_phase_report() {
     fi
 
     # Optional: drive the repo's analysis module over per-domain M365 JSON.
-    local analysis="${RECON_MODULE_DIR}/analysis_and_output.sh"
+    # analysis_and_output.sh now lives in the canonical m365 library package.
+    local analysis="${RECON_MODULE_DIR}/../lib/m365/analysis_and_output.sh"
     if [[ -f "${analysis}" ]] && have_cmd jq; then
         # shellcheck source=/dev/null
         source "${analysis}" 2> /dev/null || true
