@@ -33,10 +33,10 @@ teardown() {
   done
 }
 
-@test "lifecycle: install preserves bash/recon/ subtree" {
+@test "lifecycle: install deploys the standalone bash utilities" {
   bash "${REPO_ROOT}/install.sh" install > /dev/null 2>&1
-  [ -d "${HOME}/DATA/TOOLS/SCRIPTS/bash/recon" ]
-  [ -f "${HOME}/DATA/TOOLS/SCRIPTS/bash/recon/FRAMEWORK_OVERVIEW.md" ]
+  [ -f "${HOME}/DATA/TOOLS/SCRIPTS/bash/logger.sh" ]
+  [ -f "${HOME}/DATA/TOOLS/SCRIPTS/bash/safe_source.sh" ]
 }
 
 @test "lifecycle: install creates DATA/TOOLS/SCRIPTS when it does not exist" {

@@ -8,6 +8,23 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+## [2026.09.17.3] - 2026-09-17
+
+### Removed
+- The **internal** penetration-test suite (`bash/internal/`), the **external**
+  recon framework (`bash/recon/`), and the **M365/Entra/Azure** library
+  (`bash/lib/m365/` + `m365.sh`) were moved out of this repo into **pentest_menu**
+  (`pentest_menu/suites/internal/`, `pentest_menu/suites/external/`, and the
+  m365 library alongside the external suite), where they are now exposed as menu
+  tasks. This repo keeps only the standalone one-off utilities under `bash/`
+  and `python/`.
+
+### Changed
+- Structure/lifecycle tests no longer assert the moved `bash/recon` / `bash/lib`
+  subtrees; they assert the standalone `bash/logger.sh` / `bash/safe_source.sh`
+  utilities instead. README updated to match.
+
+
 ## [2026.09.17.2] - 2026-09-17
 
 ### Changed

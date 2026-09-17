@@ -77,26 +77,7 @@ the prior install); pass `-f`/`--force` to update without prompting.
 │   ├── mount-try.sh            # mount with backoff
 │   ├── logger.sh               # structured logging (see docs/LOGGER_README.md)
 │   ├── safe_source.sh          # safe re-sourcing helper (see docs/SAFE_SOURCE_README.md)
-│   ├── internal/               # internal penetration-test suite (see bash/internal/README.md)
-│   │   ├── run_internal_pentest.sh   # task-based orchestrator (auto-discovers tasks/)
-│   │   ├── internal_lib.sh           # common_core bootstrap + DATA/ paths + helpers
-│   │   ├── config/default.conf       # overridable paths / tunables / task toggles
-│   │   └── tasks/                    # 00-validate … 09-netexec (drop in NN-name.sh)
-│   └── recon/                  # external reconnaissance framework
-│       ├── FRAMEWORK_OVERVIEW.md, README_RECON_SUITE.md, README_UNIFIED.md
-│       ├── run_recon.sh        # unified orchestrator (phase-based)
-│       ├── lib/                # recon_lib.sh, scope_lib.sh, discovery_lib.sh
-│       ├── phases/             # 00-validate … 07-report (drop in NN-name.sh)
-│       ├── dns_email_recon.sh, dns_utils.sh
-│       ├── entra_azure_recon.sh, msgraph_recon.sh
-│       ├── m365_recon_NG.sh
-│       ├── services_recon.sh, smtp_recon.sh, smtp_utils.sh
-│       ├── cloud_surface_utils.sh, common_utils.sh
-│       ├── json_utils.sh, web_utils.sh
-│       ├── osint.sh
-│       ├── setup_engagement.sh
-│       ├── analysis_and_output.sh
-│       └── config/             # unified-{quick,default,aggressive}.conf
+│   # (standalone bash utilities only; see below)
 ├── python/                     # standalone Python utilities
 │   ├── ad_dns_enum.py          # Active Directory DNS enumeration
 │   ├── azure_tenant_enum.py    # Azure AD tenant/domain/company enumeration
@@ -112,8 +93,7 @@ the prior install); pass `-f`/`--force` to update without prompting.
 │   └── upnp.py
 ├── docs/                       # standalone usage docs
 │   ├── LOGGER_README.md
-│   ├── SAFE_SOURCE_README.md
-│   └── M365_RECON_NG.md
+│   └── SAFE_SOURCE_README.md
 ├── tests/                      # BATS coverage
 └── tools/
     └── check_bash_style.sh     # comprehensive style scan
@@ -125,16 +105,12 @@ the prior install); pass `-f`/`--force` to update without prompting.
   `debug`/`pass`/`fail`). See [`docs/LOGGER_README.md`](docs/LOGGER_README.md).
 - `bash/safe_source.sh` — safely re-source other shell scripts and roll
   back env changes. See [`docs/SAFE_SOURCE_README.md`](docs/SAFE_SOURCE_README.md).
-- `bash/recon/` — unified external-recon framework (`run_recon.sh`). See its own
-  [`FRAMEWORK_OVERVIEW.md`](bash/recon/FRAMEWORK_OVERVIEW.md),
-  [`README_RECON_SUITE.md`](bash/recon/README_RECON_SUITE.md) and
-  [`README_UNIFIED.md`](bash/recon/README_UNIFIED.md).
-- `bash/recon/m365_recon_NG.sh` — see [`docs/M365_RECON_NG.md`](docs/M365_RECON_NG.md).
-- `bash/internal/` — modular internal penetration-test suite (spoonmap →
-  Metasploit → gowitness/httpx/nuclei → NetExec). See its own
-  [`README.md`](bash/internal/README.md). It consumes tools and MSF
-  resource scripts deployed by `pentest_setup` at runtime (resolved by
-  path, degrading gracefully when a tool is absent).
+- The **internal** penetration-test suite, the **external** recon framework,
+  and the **M365/Entra/Azure** library that used to live here (`bash/internal/`,
+  `bash/recon/`, `bash/lib/m365`) now all live in **pentest_menu**
+  (`pentest_menu/suites/internal/` and `pentest_menu/suites/external/`), exposed
+  as menu tasks. This repo now ships only standalone one-off utilities under
+  `bash/` and `python/`.
 
 ### What's not here
 

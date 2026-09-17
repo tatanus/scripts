@@ -25,8 +25,9 @@ load 'helpers/common.bash'
   [ -d "${REPO_ROOT}/python" ]
 }
 
-@test "structure: bash/recon/ subtree is present" {
-  [ -d "${REPO_ROOT}/bash/recon" ]
+@test "structure: standalone bash utilities are present" {
+  [ -f "${REPO_ROOT}/bash/logger.sh" ]
+  [ -f "${REPO_ROOT}/bash/safe_source.sh" ]
 }
 
 @test "structure: install.sh has the project-mandated strict mode" {
