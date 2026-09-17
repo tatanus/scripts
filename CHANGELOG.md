@@ -8,6 +8,17 @@ and this project adheres to the project-wide date-based versioning scheme
 
 ## [Unreleased]
 
+## [2026.09.17.0] - 2026-09-17
+
+
+### Changed
+
+- `bash/internal/internal_lib.sh`: `TARGETS_FILE`/`EXCLUDES_FILE` now default to
+  `${DATA_DIR}/targets.txt` / `excludes.txt` (was `${RECON_DIR}/...`). These are
+  engagement INPUTS and live at the DATA root -- matching pentest_setup's
+  exported values (which internal_lib defers to when `pentest.env.sh` is present)
+  and every other consumer in the stack. `RECON/` is for derived recon outputs.
+
 ## [2026.09.16.2] - 2026-09-16
 
 

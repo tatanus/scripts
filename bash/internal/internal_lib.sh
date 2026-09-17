@@ -168,8 +168,11 @@ export MSF_SCRIPTS_DIR
 export SPOONMAP_DIR="${SPOONMAP_DIR:-${TOOLS_DIR}/spoonmap}"
 
 # Input files (defaults follow the spec: ${HOME}/DATA/RECON/*.txt).
-export TARGETS_FILE="${TARGETS_FILE:-${RECON_DIR}/targets.txt}"
-export EXCLUDES_FILE="${EXCLUDES_FILE:-${RECON_DIR}/excludes.txt}"
+# targets.txt / excludes.txt live at the DATA root (matches pentest_setup's
+# exported TARGETS_FILE/EXCLUDES_FILE, which this defers to when pentest.env.sh
+# is present). The RECON/ subdir is for derived recon outputs, not these inputs.
+export TARGETS_FILE="${TARGETS_FILE:-${DATA_DIR}/targets.txt}"
+export EXCLUDES_FILE="${EXCLUDES_FILE:-${DATA_DIR}/excludes.txt}"
 export DOMAINS_FILE="${DOMAINS_FILE:-${RECON_DIR}/domains.txt}"
 
 # Internal DNS server(s) for reverse/forward resolution (comma-separated).
